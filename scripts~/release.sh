@@ -29,9 +29,10 @@ Default behavior:
   - archive local artifacts under release-artifacts/<version>
 
 Publishing is opt-in:
-  --publish-github     Create or update the GitHub Release asset
-  --publish-upm-branch Force the "$UPM_BRANCH" branch to this release with Tests/ stripped —
-                       the Git URL install and OpenUPM resolve there, not main
+  --publish-github     Build the "$UPM_BRANCH" branch (this release with Tests/ stripped),
+                       tag v<version> there — not on main — and create or update the
+                       GitHub Release asset. The Git URL install and OpenUPM both resolve
+                       to that tag, so this is also what keeps Tests/ out of either.
   --publish-nuget      Push the wrapper nupkg to NuGet; requires NUGET_API_KEY
   --publish-registry   Publish server.json with mcp-publisher after NuGet indexing
   --verify-openupm     Wait for OpenUPM to index the Unity package version
@@ -74,7 +75,6 @@ RUN_TESTS=1
 EXPORT_PACKAGE=1
 USE_WRAPPER=1
 PUBLISH_GITHUB=0
-PUBLISH_UPM_BRANCH=0
 PUBLISH_NUGET=0
 PUBLISH_REGISTRY=0
 VERIFY_OPENUPM=0
@@ -86,7 +86,6 @@ while [[ $# -gt 0 ]]; do
     --no-export) EXPORT_PACKAGE=0 ;;
     --no-wrapper) USE_WRAPPER=0 ;;
     --publish-github) PUBLISH_GITHUB=1 ;;
-    --publish-upm-branch) PUBLISH_UPM_BRANCH=1 ;;
     --publish-nuget) PUBLISH_NUGET=1 ;;
     --publish-registry) PUBLISH_REGISTRY=1 ;;
     --verify-openupm) VERIFY_OPENUPM=1 ;;
@@ -460,28 +459,17 @@ pack_wrapper() {
   run cp "$WRAPPER_ROOT/server.json" "$OUT_DIR/server.json"
 }
 
-publish_github() {
-  [[ "$PUBLISH_GITHUB" == 1 ]] || return 0
-  require_command gh
-
-  info "Publishing GitHub Release v$VERSION"
-  if gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1; then
-    run gh release upload "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" --clobber
-    run gh release edit "v$VERSION" -R "$REPO" --notes-file "$NOTES_FILE"
-  else
-    run gh release create "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" --title "v$VERSION" --notes-file "$NOTES_FILE"
-  fi
-}
-
-publish_upm_branch() {
-  [[ "$PUBLISH_UPM_BRANCH" == 1 ]] || return 0
+# Builds the $UPM_BRANCH branch (this release with Tests/ stripped) and pushes it. Sets
+# UPM_COMMIT to the resulting commit so the caller can tag the release there.
+#
+# OpenUPM's tracking config for this package (data/packages/com.kitwright.unity.mcp.yml in
+# openupm/openupm) has no branch field — it watches tags matching gitTagPrefix "v" wherever
+# they land. So does the Git URL install when someone pins a version (#vX.Y.Z). The only way
+# to keep both of those Tests/-free without touching that external config is to put the
+# "vX.Y.Z" tag itself on this branch instead of on main.
+build_upm_branch() {
   require_command git
-
-  info "Publishing $UPM_BRANCH branch (Tests/ stripped) for v$VERSION"
-  if [[ "$DRY_RUN" == 1 ]]; then
-    printf '+ build %s from the working tree, strip Tests/, force-push branch + tag upm-v%s\n' "$UPM_BRANCH" "$VERSION"
-    return
-  fi
+  info "Building $UPM_BRANCH branch (Tests/ stripped) for v$VERSION"
 
   # bump_versions edits package.json/README in place and never commits — capture the
   # working tree as it stands (tracked changes included) rather than HEAD, or a release
@@ -492,7 +480,7 @@ publish_upm_branch() {
 
   local worktree_dir
   worktree_dir="$(mktemp -d)"
-  run git -C "$ROOT" worktree add --detach "$worktree_dir" "$snapshot" >/dev/null
+  git -C "$ROOT" worktree add --detach "$worktree_dir" "$snapshot" >/dev/null
 
   (
     cd "$worktree_dir"
@@ -500,11 +488,39 @@ publish_upm_branch() {
     git commit -q -m "chore(upm): strip the package-maintainer test suite for v$VERSION"
   )
 
-  run git -C "$worktree_dir" branch -f "$UPM_BRANCH" HEAD
-  run git -C "$worktree_dir" tag -f "upm-v$VERSION" HEAD
-  run git -C "$ROOT" push origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH" "refs/tags/upm-v$VERSION"
+  UPM_COMMIT="$(git -C "$worktree_dir" rev-parse HEAD)"
+  git -C "$worktree_dir" branch -f "$UPM_BRANCH" HEAD
+  git -C "$ROOT" push origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH"
+  git -C "$ROOT" worktree remove "$worktree_dir" --force
+}
 
-  run git -C "$ROOT" worktree remove "$worktree_dir" --force
+publish_github() {
+  [[ "$PUBLISH_GITHUB" == 1 ]] || return 0
+  require_command gh
+
+  if [[ "$DRY_RUN" == 1 ]]; then
+    printf '+ build %s from the working tree (Tests/ stripped), tag v%s there, publish GitHub Release\n' "$UPM_BRANCH" "$VERSION"
+    return
+  fi
+
+  # The Release asset itself (the unitypackage) already excludes Tests/ via
+  # export_unitypackage's IsAllowedPackagePath — this is only about where the "v$VERSION"
+  # tag points, since that tag is also what OpenUPM and a pinned Git URL install resolve.
+  local existing=0
+  gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1 && existing=1
+
+  if [[ "$existing" == 0 ]]; then
+    build_upm_branch
+  fi
+
+  info "Publishing GitHub Release v$VERSION"
+  if [[ "$existing" == 1 ]]; then
+    run gh release upload "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" --clobber
+    run gh release edit "v$VERSION" -R "$REPO" --notes-file "$NOTES_FILE"
+  else
+    run gh release create "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" \
+      --title "v$VERSION" --notes-file "$NOTES_FILE" --target "$UPM_COMMIT"
+  fi
 }
 
 publish_nuget() {
@@ -586,7 +602,6 @@ main() {
   pack_wrapper
   generate_notes_and_sums
   publish_github
-  publish_upm_branch
   publish_nuget
   wait_for_nuget_index
   publish_registry
