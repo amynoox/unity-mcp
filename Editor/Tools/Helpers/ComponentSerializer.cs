@@ -594,7 +594,13 @@ namespace KitWright.Editor.Tools.Helpers
                 if (!string.IsNullOrWhiteSpace(id)) return ObjectIdCodec.ToObject(id);
                 var path = token.Type == JTokenType.String ? token.ToObject<string>() : (token as JObject)?["assetPath"]?.ToObject<string>();
                 if (!string.IsNullOrEmpty(path))
-                    return AssetDatabase.LoadAssetAtPath(path, targetType) ?? throw new ArgumentException($"No {targetType.Name} at '{path}'.");
+                {
+                    // Same reasoning as the SerializedProperty path above: a .png's main asset is its
+                    // Texture2D, so a Sprite-typed field needs the sub-asset search, not a typed load.
+                    var loaded = AssetDatabase.LoadAssetAtPath(path, targetType)
+                        ?? AssetDatabase.LoadAllAssetsAtPath(path).FirstOrDefault(a => a != null && targetType.IsInstanceOfType(a));
+                    return loaded ?? throw new ArgumentException($"No {targetType.Name} at '{path}'.");
+                }
             }
             return token.ToObject(targetType);
         }
