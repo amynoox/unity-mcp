@@ -47,7 +47,7 @@ KitWright MCP for Unity 是一个采用 MIT 协议的 Unity 编辑器 MCP 服务
 在 Unity 中，打开 **Window → Package Manager → + → Add package from git URL**：
 
 ```
-https://github.com/kitwright/unity-mcp.git
+https://github.com/kitwright/unity-mcp.git#upm
 ```
 
 > 💡 在 clone 或安装之前，如果你愿意顺手点一个 ⭐，会非常感谢。
