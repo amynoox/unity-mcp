@@ -506,6 +506,9 @@ namespace KitWright.Editor.Tests
                 AssetDatabase.ImportAsset(path);
                 var importer = (TextureImporter)AssetImporter.GetAtPath(path);
                 importer.textureType = TextureImporterType.Sprite;
+                // Scripted assignment doesn't cascade the inspector's default-filling behavior, so
+                // spriteImportMode is left at None on some Unity versions and no sub-asset is generated.
+                importer.spriteImportMode = SpriteImportMode.Single;
                 importer.SaveAndReimport();
 
                 var renderer = go.AddComponent<SpriteRenderer>();
