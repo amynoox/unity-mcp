@@ -279,7 +279,14 @@ namespace KitWright.Editor.MCP.Server
         private const string ImageDataUriPrefix = "data:image/";
         private const string Base64Marker = ";base64,";
 
-        private List<Dictionary<string, object>> BuildContentFromResult(string result)
+        // A batch carries its sub-results inside one envelope, so an image arrives as a JSON string
+        // value rather than as the whole result. The first group is the media type, the second the payload.
+        private static readonly System.Text.RegularExpressions.Regex EmbeddedImage =
+            new System.Text.RegularExpressions.Regex(
+                "\"data:(image/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/]+=*)\"",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        internal static List<Dictionary<string, object>> BuildContentFromResult(string result)
         {
             var content = new List<Dictionary<string, object>>();
 
@@ -306,13 +313,40 @@ namespace KitWright.Editor.MCP.Server
             }
             else
             {
+                // Left embedded, a batch's screenshot is neither an image the client can render nor
+                // anything the agent can use - just ~700KB of base64 sitting in the transcript. Lift
+                // each one into its own block and leave a short marker where it stood.
+                content.AddRange(ExtractEmbeddedImages(result, out var text));
                 content.Add(new Dictionary<string, object>
                 {
-                    ["type"] = "text", ["text"] = result
+                    ["type"] = "text", ["text"] = text
                 });
             }
 
             return content;
+        }
+
+        private static List<Dictionary<string, object>> ExtractEmbeddedImages(string result, out string text)
+        {
+            text = result;
+            var images = new List<Dictionary<string, object>>();
+
+            if (result == null || result.IndexOf(ImageDataUriPrefix, StringComparison.Ordinal) < 0)
+                return images;
+
+            text = EmbeddedImage.Replace(result, match =>
+            {
+                images.Add(new Dictionary<string, object>
+                {
+                    ["type"] = "image",
+                    ["data"] = match.Groups[2].Value,
+                    ["mimeType"] = match.Groups[1].Value
+                });
+
+                return $"\"<image {images.Count} returned as an image block>\"";
+            });
+
+            return images;
         }
 
         // Only the {success, ...} envelope is promoted to structuredContent, so free-form JSON

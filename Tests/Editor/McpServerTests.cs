@@ -126,5 +126,50 @@ namespace KitWright.Editor.Tests
             Assert.IsTrue(result);
         }
 
+        [Test]
+        public void BuildContentFromResult_ABareDataUri_BecomesAnImageBlock()
+        {
+            var content = MCPRequestHandler.BuildContentFromResult("data:image/png;base64,iVBORw0KGgo=");
+
+            Assert.AreEqual("image", content[0]["type"]);
+            Assert.AreEqual("image/png", content[0]["mimeType"]);
+            Assert.AreEqual("iVBORw0KGgo=", content[0]["data"]);
+        }
+
+        // A batch wraps every sub-result in one envelope, so a screenshot taken inside it never
+        // reaches the top level. Left embedded it renders nowhere and costs the caller the whole
+        // base64 payload as transcript text.
+        [Test]
+        public void BuildContentFromResult_ImagesInsideABatchEnvelope_AreLiftedOut()
+        {
+            const string batch =
+                "{\"success\":true,\"data\":{\"results\":[" +
+                "{\"index\":0,\"name\":\"capture_game_view\",\"result\":\"data:image/png;base64,iVBORw0KGgo=\"}," +
+                "{\"index\":1,\"name\":\"capture_scene_view\",\"result\":\"data:image/jpeg;base64,/9j/4AAQ\"}]}}";
+
+            var content = MCPRequestHandler.BuildContentFromResult(batch);
+
+            Assert.AreEqual(3, content.Count, "two images plus the envelope text");
+            Assert.AreEqual("image/png", content[0]["mimeType"]);
+            Assert.AreEqual("iVBORw0KGgo=", content[0]["data"]);
+            Assert.AreEqual("image/jpeg", content[1]["mimeType"]);
+            Assert.AreEqual("/9j/4AAQ", content[1]["data"]);
+
+            var text = (string)content[2]["text"];
+            StringAssert.DoesNotContain("base64", text, "the payload must not also ship as text");
+            StringAssert.Contains("capture_game_view", text, "the rest of the envelope survives");
+        }
+
+        [Test]
+        public void BuildContentFromResult_PlainJson_IsLeftAlone()
+        {
+            const string json = "{\"success\":true,\"data\":{\"path\":\"Assets/data.png\"}}";
+
+            var content = MCPRequestHandler.BuildContentFromResult(json);
+
+            Assert.AreEqual(1, content.Count);
+            Assert.AreEqual(json, content[0]["text"]);
+        }
+
     }
 }
