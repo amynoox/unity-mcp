@@ -2,7 +2,7 @@
 
 Use this checklist before publishing a new open-source release of KitWright MCP for Unity.
 
-The local helper `scripts/release.sh <version>` automates the high-risk mechanical steps:
+The local helper `scripts~/release.sh <version>` automates the high-risk mechanical steps:
 version bumping, Unity EditMode tests, `.unitypackage` export, pathname validation, SHA/manifest generation,
 wrapper packing, and opt-in publishing flags for GitHub, NuGet, and the MCP Registry.
 
@@ -44,7 +44,7 @@ window. Batchmode will not do, since it skips these tests too.
 - [ ] `PowerThrottlingTests` (Windows)
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
-A skip in CI whose reason `scripts/report_test_skips.py` does not list fails the build. Add the reason
+A skip in CI whose reason `scripts~/report_test_skips.py` does not list fails the build. Add the reason
 there only when the test needs something the runners do not have, and name the test here.
 
 ## 3. MCP Client Verification
