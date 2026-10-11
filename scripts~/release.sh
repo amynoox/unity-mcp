@@ -515,7 +515,7 @@ build_upm_branch() {
 
   UPM_COMMIT="$(git -C "$worktree_dir" rev-parse HEAD)"
   git -C "$worktree_dir" branch -f "$UPM_BRANCH" HEAD
-  git -C "$ROOT" push origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH"
+  git -C "$ROOT" push --force origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH"
   git -C "$ROOT" worktree remove "$worktree_dir" --force
 }
 
