@@ -415,7 +415,9 @@ validate_unitypackage() {
   VALIDATION_TMP="$(mktemp -d)"
   trap '[[ -z "${VALIDATION_TMP:-}" ]] || rm -rf "$VALIDATION_TMP"; cleanup_exporter' EXIT
 
-  tar -xzf "$PACKAGE_OUTPUT" -C "$VALIDATION_TMP"
+  # -f with a drive-letter path (C:/...) reads as tar's user@host:path remote
+  # syntax on some tar builds (MSYS/Git Bash); stdin redirection sidesteps it.
+  tar -xz -C "$VALIDATION_TMP" < "$PACKAGE_OUTPUT"
   find "$VALIDATION_TMP" -name pathname -print0 \
     | while IFS= read -r -d '' file; do tr -d '\000' < "$file"; printf '\n'; done \
     | sort > "$OUT_DIR/unitypackage-pathnames.txt"
