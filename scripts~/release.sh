@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 REPO="kitwright/unity-mcp"
+UPM_BRANCH="upm"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_ROOT="${UNITY_PROJECT_ROOT:-$(cd "$ROOT/../.." && pwd)}"
 ARTIFACT_ROOT="${RELEASE_ARTIFACT_DIR:-$PROJECT_ROOT/release-artifacts}"
@@ -29,6 +30,8 @@ Default behavior:
 
 Publishing is opt-in:
   --publish-github     Create or update the GitHub Release asset
+  --publish-upm-branch Force the "$UPM_BRANCH" branch to this release with Tests/ stripped —
+                       the Git URL install and OpenUPM resolve there, not main
   --publish-nuget      Push the wrapper nupkg to NuGet; requires NUGET_API_KEY
   --publish-registry   Publish server.json with mcp-publisher after NuGet indexing
   --verify-openupm     Wait for OpenUPM to index the Unity package version
@@ -71,6 +74,7 @@ RUN_TESTS=1
 EXPORT_PACKAGE=1
 USE_WRAPPER=1
 PUBLISH_GITHUB=0
+PUBLISH_UPM_BRANCH=0
 PUBLISH_NUGET=0
 PUBLISH_REGISTRY=0
 VERIFY_OPENUPM=0
@@ -82,6 +86,7 @@ while [[ $# -gt 0 ]]; do
     --no-export) EXPORT_PACKAGE=0 ;;
     --no-wrapper) USE_WRAPPER=0 ;;
     --publish-github) PUBLISH_GITHUB=1 ;;
+    --publish-upm-branch) PUBLISH_UPM_BRANCH=1 ;;
     --publish-nuget) PUBLISH_NUGET=1 ;;
     --publish-registry) PUBLISH_REGISTRY=1 ;;
     --verify-openupm) VERIFY_OPENUPM=1 ;;
@@ -468,6 +473,40 @@ publish_github() {
   fi
 }
 
+publish_upm_branch() {
+  [[ "$PUBLISH_UPM_BRANCH" == 1 ]] || return 0
+  require_command git
+
+  info "Publishing $UPM_BRANCH branch (Tests/ stripped) for v$VERSION"
+  if [[ "$DRY_RUN" == 1 ]]; then
+    printf '+ build %s from the working tree, strip Tests/, force-push branch + tag upm-v%s\n' "$UPM_BRANCH" "$VERSION"
+    return
+  fi
+
+  # bump_versions edits package.json/README in place and never commits — capture the
+  # working tree as it stands (tracked changes included) rather than HEAD, or a release
+  # cut before the version-bump commit lands would publish the branch one version stale.
+  local snapshot
+  snapshot="$(git -C "$ROOT" stash create)"
+  [[ -n "$snapshot" ]] || snapshot="$(git -C "$ROOT" rev-parse HEAD)"
+
+  local worktree_dir
+  worktree_dir="$(mktemp -d)"
+  run git -C "$ROOT" worktree add --detach "$worktree_dir" "$snapshot" >/dev/null
+
+  (
+    cd "$worktree_dir"
+    git rm -rq Tests
+    git commit -q -m "chore(upm): strip the package-maintainer test suite for v$VERSION"
+  )
+
+  run git -C "$worktree_dir" branch -f "$UPM_BRANCH" HEAD
+  run git -C "$worktree_dir" tag -f "upm-v$VERSION" HEAD
+  run git -C "$ROOT" push origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH" "refs/tags/upm-v$VERSION"
+
+  run git -C "$ROOT" worktree remove "$worktree_dir" --force
+}
+
 publish_nuget() {
   [[ "$PUBLISH_NUGET" == 1 ]] || return 0
   require_command dotnet
@@ -547,6 +586,7 @@ main() {
   pack_wrapper
   generate_notes_and_sums
   publish_github
+  publish_upm_branch
   publish_nuget
   wait_for_nuget_index
   publish_registry
