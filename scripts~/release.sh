@@ -244,13 +244,36 @@ run_unity_tests() {
   fi
 
   info "Running Unity EditMode tests"
-  run "$unity_bin" \
+  if [[ "$DRY_RUN" == 1 ]]; then
+    run "$unity_bin" \
+      -batchmode \
+      -projectPath "$PROJECT_ROOT" \
+      -runTests \
+      -testPlatform EditMode \
+      -testResults "$OUT_DIR/editmode-results.xml" \
+      -logFile "$OUT_DIR/unity-editmode-tests.log"
+    return
+  fi
+
+  # Unity's own exit code reflects its NUnit "result" attribute, which goes
+  # non-zero on an Ignored/Inconclusive test same as a real failure; this suite
+  # always carries a few declared Ignores, so the gate has to be the "failed"
+  # count in the results XML instead, same as CI's actual pass/fail policy.
+  if ! "$unity_bin" \
     -batchmode \
     -projectPath "$PROJECT_ROOT" \
     -runTests \
     -testPlatform EditMode \
     -testResults "$OUT_DIR/editmode-results.xml" \
-    -logFile "$OUT_DIR/unity-editmode-tests.log"
+    -logFile "$OUT_DIR/unity-editmode-tests.log"; then
+    :
+  fi
+
+  [[ -f "$OUT_DIR/editmode-results.xml" ]] || fail "Unity test results not found: $OUT_DIR/editmode-results.xml (see $OUT_DIR/unity-editmode-tests.log)"
+  local failed
+  failed="$(rg -o 'failed="[0-9]+"' "$OUT_DIR/editmode-results.xml" | head -1 | rg -o '[0-9]+')"
+  [[ -n "$failed" ]] || fail "could not read failed-test count from $OUT_DIR/editmode-results.xml"
+  [[ "$failed" == "0" ]] || fail "$failed Unity EditMode test(s) failed; see $OUT_DIR/unity-editmode-tests.log"
 }
 
 cleanup_exporter() {
