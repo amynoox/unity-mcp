@@ -27,7 +27,10 @@ namespace KitWright.Editor.MCP.Server
         // v7: pulls and attaches carry ClientTokenHeader, the access token MCP clients must present
         //     in the URL, and the broker refuses a client without it before queueing anything. A v6
         //     broker forwarded every loopback caller to the editor, so the bump replaces it.
-        public const int Version = 7;
+        // v8: a null editor response is an accepted notification, forwarded as an empty HTTP 202.
+        //     A v7 broker discards that status and writes 200, breaking strict MCP initialization.
+        //     Replace it rather than adopting a still-running broker with the old wire behavior.
+        public const int Version = 8;
         public const string Name = "kitwright-unity-mcp-broker";
         public const string HealthPath = "/_kitwright/broker/health";
         public const string AttachPath = "/_kitwright/broker/attach";

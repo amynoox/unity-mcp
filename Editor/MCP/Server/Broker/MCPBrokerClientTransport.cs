@@ -236,7 +236,9 @@ namespace KitWright.Editor.MCP.Server
                             var response = await responseTcs.Task;
                             if (response == null)
                             {
-                                responseJson = SerializeResponse(CreateAccepted(request.Id));
+                                // Notifications have no JSON-RPC response. Streamable HTTP requires
+                                // an empty 202, including when the client also accepts SSE.
+                                clientStatus = (int)HttpStatusCode.Accepted;
                             }
                             else
                             {
@@ -532,25 +534,6 @@ namespace KitWright.Editor.MCP.Server
             {
                 Id = requestId,
                 Error = new MCPError { Code = code, Message = message }
-            };
-        }
-
-        private static MCPResponse CreateAccepted(object requestId)
-        {
-            return new MCPResponse
-            {
-                Id = requestId,
-                Result = new Dictionary<string, object>
-                {
-                    ["content"] = new[]
-                    {
-                        new Dictionary<string, object>
-                        {
-                            ["type"] = "text",
-                            ["text"] = "Accepted."
-                        }
-                    }
-                }
             };
         }
 

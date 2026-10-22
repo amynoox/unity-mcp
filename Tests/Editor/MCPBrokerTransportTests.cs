@@ -523,11 +523,90 @@ namespace KitWright.Editor
             }
         }
 
-        // The refusal has to be an HTTP 404, not a JSON-RPC error inside a 200: 404 is what makes a
-        // client re-initialize, and a client served 200 keeps the dead id and fails every later call
-        // while the connection still looks healthy. Broker mode could not answer 404 until the editor
-        // was given a way to name the status, so pin the status here rather than the decision --
-        // BrokerSession_InitializeMintsAnIdAndUnknownIdsAreRefused already covers the decision.
+        [UnityTest]
+        public IEnumerator BrokerTransport_FreshInitializationAcceptsNotificationsWithoutAResponse()
+        {
+            var root = CreateTempRoot();
+            var paths = CreateBrokerPaths(root);
+            var port = GetFreeTcpPort();
+            MCPBrokerClientTransport transport = null;
+            var token = new string('a', ServerToken.Length);
+
+            try
+            {
+                Assume.That(!string.IsNullOrEmpty(MCPBrokerProcessManager.ResolveMono(string.Empty)),
+                    "Unity-bundled Mono is required for broker process tests.");
+                Assert.IsTrue(MCPBrokerProcessManager.EnsureRunning(port, string.Empty, paths), MCPBrokerProcessManager.LastError);
+                Assert.IsTrue(MCPBrokerProcessManager.TryGetConnectionInfo(paths, port, out var connection));
+
+                transport = new MCPBrokerClientTransport(port, connection.Token, token);
+                transport.OnRequestReceived += (request, sendResponse) =>
+                    sendResponse(request.Id == null ? null : CreateToolTextResponse(request.Id, "served"));
+                var start = transport.StartAsync();
+                yield return WaitForTask(start);
+                Assert.IsTrue(start.Result);
+
+                // Fresh clients must finish initialize -> initialized -> tools/list. Test both
+                // Accept forms: a notification must not consume a pending SSE list change.
+                foreach (var acceptsSse in new[] { false, true })
+                {
+                    var initialize = SendBrokerProtocolMessageAsync(port, token,
+                        "{\"jsonrpc\":\"2.0\",\"id\":\"init\",\"method\":\"initialize\",\"params\":{}}");
+                    yield return WaitForTask(initialize, 8f);
+                    Assert.AreEqual(HttpStatusCode.OK, initialize.Result.StatusCode);
+                    var session = string.Join("", initialize.Result.Headers.GetValues("Mcp-Session-Id"));
+                    Assert.IsNotEmpty(session);
+                    MCPToolListChangeNotifier.MarkChanged();
+
+                    var notification = SendBrokerProtocolMessageAsync(port, token,
+                        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}", session, acceptsSse);
+                    yield return WaitForTask(notification, 8f);
+                    Assert.AreEqual(HttpStatusCode.Accepted, notification.Result.StatusCode);
+                    var notificationBody = notification.Result.Content.ReadAsByteArrayAsync();
+                    yield return WaitForTask(notificationBody);
+                    Assert.IsEmpty(notificationBody.Result, "notifications have no JSON-RPC response, including id:null");
+
+                    var list = SendBrokerProtocolMessageAsync(port, token,
+                        "{\"jsonrpc\":\"2.0\",\"id\":\"list\",\"method\":\"tools/list\",\"params\":{}}", session, true);
+                    yield return WaitForTask(list, 8f);
+                    Assert.AreEqual(HttpStatusCode.OK, list.Result.StatusCode);
+                    var listBody = list.Result.Content.ReadAsStringAsync();
+                    yield return WaitForTask(listBody);
+                    StringAssert.Contains("notifications/tools/list_changed", listBody.Result);
+                    StringAssert.Contains("\"id\":\"list\"", listBody.Result);
+
+                    initialize.Result.Dispose();
+                    notification.Result.Dispose();
+                    list.Result.Dispose();
+                }
+            }
+            finally
+            {
+                transport?.Dispose();
+                MCPBrokerProcessManager.Stop(paths);
+                DeleteTempRoot(root);
+            }
+        }
+
+        private static async Task<HttpResponseMessage> SendBrokerProtocolMessageAsync(int port, string token,
+            string body, string session = null, bool acceptsSse = false)
+        {
+            using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(12) })
+            using (var request = new HttpRequestMessage(HttpMethod.Post,
+                       "http://127.0.0.1:" + port + "/t/" + token + "/"))
+            {
+                request.Headers.TryAddWithoutValidation("Accept",
+                    acceptsSse ? "application/json, text/event-stream" : "application/json");
+                if (session != null)
+                    request.Headers.Add("Mcp-Session-Id", session);
+                request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                var response = await client.SendAsync(request);
+                await response.Content.LoadIntoBufferAsync();
+                return response;
+            }
+        }
+
+        // The refusal has to be HTTP 404 so a client with a dead session re-initializes.
         [UnityTest]
         public IEnumerator BrokerTransport_RefusesADeadSessionWithNotFound()
         {

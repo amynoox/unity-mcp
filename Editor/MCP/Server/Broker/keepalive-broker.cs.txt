@@ -455,16 +455,24 @@ namespace KitWright.UnityMcp.Broker
                         : "Mcp-Session-Id: " + issuedMcpSession + "\r\n";
                     // The editor decides the client-facing status for refusals it owns -- a dead
                     // Mcp-Session-Id has to arrive as 404 or the client never re-initializes. Only
-                    // error codes are honoured, so a malformed header cannot rewrite a good response.
+                    // errors and empty 202 notification acknowledgments are honoured, so a
+                    // malformed success header cannot rewrite a good response.
                     var statusCode = 200;
                     var statusReason = "OK";
                     int requestedStatus;
                     if (!string.IsNullOrEmpty(clientStatus)
-                        && int.TryParse(clientStatus, out requestedStatus)
-                        && requestedStatus >= 400 && requestedStatus <= 599)
+                        && int.TryParse(clientStatus, out requestedStatus))
                     {
-                        statusCode = requestedStatus;
-                        statusReason = requestedStatus == 404 ? "Not Found" : "Error";
+                        if (requestedStatus == 202 && string.IsNullOrEmpty(body))
+                        {
+                            statusCode = 202;
+                            statusReason = "Accepted";
+                        }
+                        else if (requestedStatus >= 400 && requestedStatus <= 599)
+                        {
+                            statusCode = requestedStatus;
+                            statusReason = requestedStatus == 404 ? "Not Found" : "Error";
+                        }
                     }
                     WriteResponse(pending.Stream, statusCode, statusReason, responseContentType, extraHeaders, body ?? string.Empty);
                 }
