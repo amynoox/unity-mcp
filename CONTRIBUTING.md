@@ -31,6 +31,13 @@ See [README.md](README.md#adding-custom-tools) for a full example.
 
 ## Validation
 
+This project is qualified on the existing local LAN Windows and macOS machines.
+Record the exact source revision, Unity version, EditMode results and skips from
+both native platforms. GitHub Actions test jobs are no longer triggered by
+pushes or pull requests; do not trigger them for this workflow. Keep physical
+focus/input evidence separate from batch-mode or fixture tests. Retain the
+one-Editor rule and existing work when using a disposable package-test project.
+
 Before submitting a PR, please verify the change in a Unity test project:
 
 1. Open **Window → KitWright → MCP Window**
