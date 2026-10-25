@@ -14,8 +14,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-# What the CI runners do not have. Anything else is a skip nobody decided on. The tests these
-# cover are run by hand before a release: RELEASE_CHECKLIST.md, "Tests CI cannot run".
+# What a minimal/headless fixture does not have. Anything else is an undeclared omission.
+# These capabilities still require native qualification: RELEASE_CHECKLIST.md.
 EXPECTED = [
     r"No graphics device",
     r"No usable screen",
@@ -38,6 +38,13 @@ EXPECTED = [
     r"no Game View to route",
 ]
 
+# Match both the test and its exact Explicit reason. A generic "Explicit" allowance would
+# hide unrelated tests that stopped running. This is a deferred interactive gate, not a pass.
+EXPECTED_NAMED_SKIPS = {
+    "KitWright.Editor.Tests.EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView":
+        "Owned interactive disposable project only; owner must select another app during the initial delay.",
+}
+
 
 def results_files(paths):
     for path in paths:
@@ -49,7 +56,8 @@ def results_files(paths):
 
 def main():
     label, paths = sys.argv[1], sys.argv[2:]
-    rows, unexpected, totals = [], [], {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+    rows, unexpected, deferred = [], [], []
+    totals = {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "inconclusive": 0}
     for path in results_files(paths):
         root = ET.parse(path).getroot()
         if root.tag != "test-run":
@@ -63,15 +71,23 @@ def main():
             reason = ((node.text if node is not None else "") or "").strip().splitlines()
             reason = reason[0] if reason else "(no reason given)"
             name = case.get("fullname") or case.get("name")
-            rows.append((name, reason))
-            if not any(re.search(pattern, reason, re.IGNORECASE) for pattern in EXPECTED):
+            rows.append((name, case.get("result"), reason))
+            named_skip = (case.get("result") == "Skipped" and
+                          EXPECTED_NAMED_SKIPS.get(name) == reason)
+            if named_skip:
+                deferred.append(name)
+            if not named_skip and not any(re.search(pattern, reason, re.IGNORECASE) for pattern in EXPECTED):
                 unexpected.append((name, reason))
 
-    lines = [f"### {label}: {totals['passed']} passed, {totals['failed']} failed, {totals['skipped']} skipped "
+    lines = [f"### {label}: {totals['passed']} passed, {totals['failed']} failed, {totals['skipped']} skipped, "
+             f"{totals['inconclusive']} inconclusive "
              f"of {totals['total']}", ""]
     if rows:
-        lines += ["| Skipped test | Reason |", "|---|---|"]
-        lines += [f"| `{name}` | {reason.replace('|', '/')} |" for name, reason in rows]
+        lines += ["| Omitted test | Result | Reason |", "|---|---|---|"]
+        lines += [f"| `{name}` | {result} | {reason.replace('|', '/')} |" for name, result, reason in rows]
+    if deferred:
+        lines += ["", "**Interactive focus qualification is still pending. These omissions are not passes.**"]
+        lines += [f"- Run `{name}` in an owned interactive Windows and macOS Editor." for name in sorted(set(deferred))]
     if unexpected:
         lines += ["", f"**{len(unexpected)} skipped for a reason not in scripts~/report_test_skips.py EXPECTED:**"]
         lines += [f"- `{name}`: {reason}" for name, reason in unexpected]
@@ -89,7 +105,7 @@ def main():
         return 1
     for name, reason in unexpected:
         print(f"::error::{name} was skipped: {reason}")
-    return 1 if unexpected else 0
+    return 1 if unexpected or totals["failed"] else 0
 
 
 if __name__ == "__main__":

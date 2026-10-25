@@ -39,6 +39,9 @@ explain why LAN validation is unsuitable and obtain explicit human permission.
 General permission to implement or test is not sufficient. Keep physical
 focus/input evidence separate from batch-mode or fixture tests. Retain the
 one-Editor rule and existing work when using a disposable package-test project.
+Run `python -m unittest discover -s 'scripts~/tests'` for the result-reporting
+checks. The reporter lists expected omissions separately; it does not replace
+the required interactive focus test on each native platform.
 
 Before submitting a PR, please verify the change in a Unity test project:
 
