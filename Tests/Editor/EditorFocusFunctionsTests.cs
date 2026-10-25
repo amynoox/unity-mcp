@@ -33,6 +33,7 @@ namespace KitWright.Editor.Tests
                 supported = State.supported, batchMode = State.batchMode, busy = State.busy,
                 modal = State.modal, editorPid = State.editorPid, foregroundPid = State.foregroundPid,
                 projectPath = State.projectPath, gameViewCount = State.gameViewCount,
+                applicationFocused = State.applicationFocused,
                 gameViewFocused = State.gameViewFocused, observationError = State.observationError
             };
             public bool RequestApplicationFocus(out string reason)
