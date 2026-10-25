@@ -44,6 +44,7 @@ namespace KitWright.Editor.Tools.Helpers
                 try
                 {
                     state.foregroundPid = ForegroundPid();
+                    state.nativeWindowFocused = NativeWindowFocused(state.foregroundPid, state.editorPid);
                     state.modal = HasModalWindow();
                 }
                 catch (Exception ex) { state.observationError = ex.GetType().Name; }
@@ -69,7 +70,15 @@ namespace KitWright.Editor.Tools.Helpers
                 var current = SendPointer(objc_getClass("NSRunningApplication"), sel_registerName("currentApplication"));
                 // A normal AppKit activation request, only for the current Editor. No shell,
                 // arbitrary PID, Accessibility grant, unlock, or security-policy modification.
-                if (SendActivation(current, sel_registerName("activateWithOptions:"), new UIntPtr(2))) return true;
+                if (SendActivation(current, sel_registerName("activateWithOptions:"), new UIntPtr(2)))
+                {
+                    var app = SendPointer(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
+                    var main = SendPointer(app, sel_registerName("mainWindow"));
+                    if (main == IntPtr.Zero) main = SendPointer(app, sel_registerName("keyWindow"));
+                    if (main == IntPtr.Zero) { reason = "This Editor has no native main/key window."; return false; }
+                    SendVoidArgument(main, sel_registerName("makeKeyAndOrderFront:"), IntPtr.Zero);
+                    return true;
+                }
                 reason = "AppKit refused this Editor's activation request.";
 #else
                 reason = "Only Windows and macOS interactive Editors are supported.";
@@ -108,6 +117,7 @@ namespace KitWright.Editor.Tools.Helpers
             GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
             return (int)pid;
         }
+        private static bool NativeWindowFocused(int foreground, int editor) => foreground == editor;
         private static bool HasModalWindow()
         {
             var window = MainWindow();
@@ -130,6 +140,13 @@ namespace KitWright.Editor.Tools.Helpers
             var front = SendPointer(workspace, sel_registerName("frontmostApplication"));
             return front == IntPtr.Zero ? 0 : SendInt(front, sel_registerName("processIdentifier"));
         }
+        private static bool NativeWindowFocused(int foreground, int editor)
+        {
+            if (foreground != editor) return false;
+            var app = SendPointer(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
+            var key = SendPointer(app, sel_registerName("keyWindow"));
+            return key != IntPtr.Zero && SendBool(key, sel_registerName("isKeyWindow"));
+        }
         private static bool HasModalWindow()
         {
             var app = SendPointer(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
@@ -143,6 +160,11 @@ namespace KitWright.Editor.Tools.Helpers
         private static extern IntPtr SendPointer(IntPtr receiver, IntPtr selector);
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
         private static extern int SendInt(IntPtr receiver, IntPtr selector);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        [return: MarshalAs(UnmanagedType.I1)]
+        private static extern bool SendBool(IntPtr receiver, IntPtr selector);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern void SendVoidArgument(IntPtr receiver, IntPtr selector, IntPtr argument);
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static extern bool SendActivation(IntPtr receiver, IntPtr selector, UIntPtr options);

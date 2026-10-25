@@ -22,7 +22,7 @@ namespace KitWright.Editor.Tests
             internal EditorFocusState State = new EditorFocusState
             {
                 supported = true, editorPid = 42, foregroundPid = 7,
-                projectPath = "/test", gameViewCount = 1
+                projectPath = "/test", gameViewCount = 1, nativeWindowFocused = true
             };
             internal bool ActivateAllowed = true, FocusAllowed = true;
             internal Action<int, Backend> Tick;
@@ -32,6 +32,7 @@ namespace KitWright.Editor.Tests
             {
                 supported = State.supported, batchMode = State.batchMode, busy = State.busy,
                 modal = State.modal, editorPid = State.editorPid, foregroundPid = State.foregroundPid,
+                nativeWindowFocused = State.nativeWindowFocused,
                 projectPath = State.projectPath, gameViewCount = State.gameViewCount,
                 applicationFocused = State.applicationFocused,
                 gameViewFocused = State.gameViewFocused, observationError = State.observationError
@@ -141,6 +142,16 @@ namespace KitWright.Editor.Tests
             Assert.IsTrue((bool)Run(backend)["success"]);
             Assert.Zero(backend.Activations);
             Assert.AreEqual(2, backend.Updates);
+        }
+
+        [Test]
+        public void ForegroundApplicationWithoutKeyWindowStillNeedsActivation()
+        {
+            var backend = new Backend { Tick = (n, b) => b.State.nativeWindowFocused = true };
+            backend.State.foregroundPid = 42;
+            backend.State.nativeWindowFocused = false;
+            Assert.IsTrue((bool)Run(backend)["success"]);
+            Assert.AreEqual(1, backend.Activations);
         }
 
         [TestCase(0, "GAME_VIEW_NOT_OPEN")]

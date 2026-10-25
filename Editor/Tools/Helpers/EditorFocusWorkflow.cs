@@ -17,6 +17,7 @@ namespace KitWright.Editor.Tools.Helpers
         public bool busy;
         public bool modal;
         public int foregroundPid;
+        public bool nativeWindowFocused;
         public bool applicationFocused;
         public string focusedWindowType;
         public int gameViewCount;
@@ -24,7 +25,7 @@ namespace KitWright.Editor.Tools.Helpers
         public string observationError;
         public double observedAt;
 
-        public bool ForegroundVerified => supported && editorPid > 0 && foregroundPid == editorPid;
+        public bool ForegroundVerified => supported && editorPid > 0 && foregroundPid == editorPid && nativeWindowFocused;
     }
 
     internal interface IEditorFocusBackend
