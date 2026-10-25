@@ -27,11 +27,12 @@ wrapper packing, and opt-in publishing flags for GitHub, NuGet, and the MCP Regi
 - [ ] Verify interaction logs appear in the MCP Server window
 - [ ] Trigger a script recompile and confirm the MCP server recovers correctly
 
-### Tests CI cannot run
+### Tests requiring an interactive Editor
 
-The CI runners are headless Linux: no graphics device, no screen, no editor loop between test
-frames, and no Hot Reload or URP. The tests that need those skip there, and the **Report skipped
-tests** step lists them per leg. Run them once per release in an editor that has what they need:
+Run qualification on the available local LAN Windows and macOS machines and
+record the exact source revision and test environment. Headless fixture runs lack
+a graphics device, screen and interactive editor loop. Tests that need those must
+also run once per release in an editor that has what they need:
 open a project with both packages as testables, then run the EditMode suite from the Test Runner
 window. Batchmode will not do, since it skips these tests too.
 
@@ -42,10 +43,13 @@ window. Batchmode will not do, since it skips these tests too.
 - [ ] `HotReloadInteropTests` (SingularityGroup Hot Reload installed), and the Volume tools' tests (URP installed)
 - [ ] `InputSimulationFunctionsTests` mouse drag, touch and gamepad (a Game View to route device input to)
 - [ ] `PowerThrottlingTests` (Windows)
+- [ ] `EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView` (owned interactive Windows and macOS; actual foreground and Game View focus)
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
-A skip in CI whose reason `scripts~/report_test_skips.py` does not list fails the build. Add the reason
-there only when the test needs something the runners do not have, and name the test here.
+Record all skips and their actual environmental reasons; never count them as
+passes. GitHub Actions may be used only after explaining why LAN machines are
+unsuitable and obtaining explicit human permission. If that exception is granted,
+the hosted skip-reporting checks still apply.
 
 ## 3. MCP Client Verification
 
@@ -62,7 +66,7 @@ there only when the test needs something the runners do not have, and name the t
 
 ## 5. GitHub Release Readiness
 
-- [ ] `.github/workflows/ci.yml` passes
+- [ ] Full native Windows and macOS suites passed at the same committed source; logs and skip reasons retained
 - [ ] PR checklist still reflects the current release process
 - [ ] License file is present and correct
 - [ ] Repository description/topics are set on GitHub

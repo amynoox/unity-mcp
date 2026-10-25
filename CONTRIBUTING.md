@@ -31,6 +31,18 @@ See [README.md](README.md#adding-custom-tools) for a full example.
 
 ## Validation
 
+This project is qualified on the existing local LAN Windows and macOS machines.
+Record the exact source revision, Unity version, EditMode results and skips from
+both native platforms. GitHub Actions test jobs are no longer triggered by
+pushes or pull requests. Prefer local LAN validation; before using GitHub Actions,
+explain why LAN validation is unsuitable and obtain explicit human permission.
+General permission to implement or test is not sufficient. Keep physical
+focus/input evidence separate from batch-mode or fixture tests. Retain the
+one-Editor rule and existing work when using a disposable package-test project.
+Run `python -m unittest discover -s 'scripts~/tests'` for the result-reporting
+checks. The reporter lists expected omissions separately; it does not replace
+the required interactive focus test on each native platform.
+
 Before submitting a PR, please verify the change in a Unity test project:
 
 1. Open **Window → KitWright → MCP Window**

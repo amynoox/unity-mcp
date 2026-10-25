@@ -41,7 +41,8 @@ namespace KitWright.Editor.Tools.Builtins
                 applicationPath = EditorApplication.applicationPath,
                 timeSinceStartup = EditorApplication.timeSinceStartup,
                 timeScale = Time.timeScale,
-                unityVersion = Application.unityVersion
+                unityVersion = Application.unityVersion,
+                focus = new NativeEditorFocus().Capture()
             });
         }
 
