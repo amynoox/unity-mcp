@@ -51,6 +51,13 @@ passes. GitHub Actions may be used only after explaining why LAN machines are
 unsuitable and obtaining explicit human permission. If that exception is granted,
 the hosted skip-reporting checks still apply.
 
+Keep batch and interactive phases independent. A batch run can exit nonzero for
+an inconclusive fixture even when it has no failed tests. Retain its exit code,
+XML and omission reasons; do not rename it a pass. After reviewing that outcome
+and the current ownership/preservation guards, run the separately authorized
+interactive focus check with a new phase receipt. Never replay a completed batch
+run just to reach the interactive phase or clear an unrelated fixture omission.
+
 ## 3. MCP Client Verification
 
 - [ ] Verify at least one primary client can connect (`Claude Code`, `Cursor`, `Codex`, etc.)
