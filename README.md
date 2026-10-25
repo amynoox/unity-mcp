@@ -36,6 +36,24 @@ Describe your game in one sentence — your AI assistant builds it in Unity thro
 
 ## Quick Start
 
+### Verified Editor focus
+
+On an owned, interactive Windows or macOS Editor, use `focus_unity_editor` to
+request foreground activation of the connected Editor process, then
+`focus_game_view` to focus its existing Game View. Both are included in the
+minimal and core tool profiles. They target only the connected Editor, accept
+`timeout_ms` (100–5000, default 2000), and verify the result on two later Editor
+updates. `get_editor_state` also includes the current native `focus` observation.
+
+A successful menu invocation or activation request alone is not success. The
+commands report OS refusal, unavailable/headless desktops, modal or busy Editors,
+missing/ambiguous Game Views, and verification timeouts as structured failures.
+They never unlock a session, change permissions, inject a click/key, start Play
+Mode, create another window, or retry activation in a loop. After a transport
+timeout, inspect current state before deciding whether an operation may be
+retried. Focus evidence does not prove that a game consumed input; perform the
+separate owned input check before live QA.
+
 If you just want to get connected fast, do these three things:
 
 - Install the Unity package from the Git URL
@@ -367,7 +385,7 @@ The current open-source package exposes four high-value capability layers:
 ## Built-in Tools
 
 <!-- tools-summary:start -->
-KitWright MCP for Unity ships **273 tool functions across 57 modules** (`core` profile exposes 53 of them).
+KitWright MCP for Unity ships **275 tool functions across 58 modules** (`core` profile exposes 55 of them).
 
 | Module | Tools | Module | Tools |
 |--------|-------|--------|-------|
@@ -385,21 +403,21 @@ KitWright MCP for Unity ships **273 tool functions across 57 modules** (`core` p
 | **SpriteAtlas** | 7 | **Undo** | 3 |
 | **UI** | 7 | **AssetImport** | 2 |
 | **Visual** | 7 | **EditorDialog** | 2 |
-| **Addressable** | 6 | **EditorWindowInteraction** | 2 |
-| **Audio** | 6 | **Material** | 2 |
-| **Code** | 6 | **Performance** | 2 |
-| **InputActions** | 6 | **ProjectSettings** | 2 |
-| **NavMesh** | 6 | **References** | 2 |
-| **Shader** | 6 | **Batch** | 1 |
-| **File** | 5 | **Hierarchy** | 1 |
-| **MemorySnapshot** | 5 | **Interop** | 1 |
-| **SceneView** | 5 | **MenuItem** | 1 |
-| **Screenshot** | 5 | **Mesh** | 1 |
-| **Volume** | 5 | **Particle** | 1 |
-| **Camera** | 4 | **Reflection** | 1 |
-| **Compilation** | 4 | **Timeline** | 1 |
-| **LodConstraint** | 4 | **ToolExposure** | 1 |
-| **Script** | 4 |  |  |
+| **Addressable** | 6 | **EditorFocus** | 2 |
+| **Audio** | 6 | **EditorWindowInteraction** | 2 |
+| **Code** | 6 | **Material** | 2 |
+| **InputActions** | 6 | **Performance** | 2 |
+| **NavMesh** | 6 | **ProjectSettings** | 2 |
+| **Shader** | 6 | **References** | 2 |
+| **File** | 5 | **Batch** | 1 |
+| **MemorySnapshot** | 5 | **Hierarchy** | 1 |
+| **SceneView** | 5 | **Interop** | 1 |
+| **Screenshot** | 5 | **MenuItem** | 1 |
+| **Volume** | 5 | **Mesh** | 1 |
+| **Camera** | 4 | **Particle** | 1 |
+| **Compilation** | 4 | **Reflection** | 1 |
+| **LodConstraint** | 4 | **Timeline** | 1 |
+| **Script** | 4 | **ToolExposure** | 1 |
 
 > 📖 Every tool with its description: [TOOLS.md](TOOLS.md).
 <!-- tools-summary:end -->

@@ -36,6 +36,15 @@ KitWright MCP for Unity 是一个采用 MIT 协议的 Unity 编辑器 MCP 服务
 
 ## 快速开始
 
+### 验证编辑器焦点
+
+`focus_unity_editor` 请求将当前连接的 Unity 编辑器置于前台；
+`focus_game_view` 聚焦已有的 Game View。两个工具均包含在 minimal 和 core
+配置中，支持 Windows/macOS 交互式编辑器，并在后续两次编辑器更新后验证结果。
+`get_editor_state` 的 `focus` 字段可读取当前状态。
+它们不会解锁系统、更改权限、模拟按键或点击、创建窗口或进入 Play Mode。
+系统拒绝、模态窗口、忙碌状态及验证超时会明确返回失败；焦点成功不代表游戏已收到输入。
+
 如果你只想尽快跑起来，先做这三步：
 
 - 用 Git URL 安装 Unity 包
@@ -369,7 +378,7 @@ Coplay 信息来源：[CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-m
 ## 内置工具
 
 <!-- tools-summary:start -->
-KitWright MCP for Unity 当前提供 **273 个工具函数，覆盖 57 个模块**（`core` profile 暴露其中 53 个）。
+KitWright MCP for Unity 当前提供 **275 个工具函数，覆盖 58 个模块**（`core` profile 暴露其中 55 个）。
 
 | 模块 | 工具数 | 模块 | 工具数 |
 |------|--------|------|--------|
@@ -387,21 +396,21 @@ KitWright MCP for Unity 当前提供 **273 个工具函数，覆盖 57 个模块
 | **SpriteAtlas** | 7 | **Undo** | 3 |
 | **UI** | 7 | **AssetImport** | 2 |
 | **Visual** | 7 | **EditorDialog** | 2 |
-| **Addressable** | 6 | **EditorWindowInteraction** | 2 |
-| **Audio** | 6 | **Material** | 2 |
-| **Code** | 6 | **Performance** | 2 |
-| **InputActions** | 6 | **ProjectSettings** | 2 |
-| **NavMesh** | 6 | **References** | 2 |
-| **Shader** | 6 | **Batch** | 1 |
-| **File** | 5 | **Hierarchy** | 1 |
-| **MemorySnapshot** | 5 | **Interop** | 1 |
-| **SceneView** | 5 | **MenuItem** | 1 |
-| **Screenshot** | 5 | **Mesh** | 1 |
-| **Volume** | 5 | **Particle** | 1 |
-| **Camera** | 4 | **Reflection** | 1 |
-| **Compilation** | 4 | **Timeline** | 1 |
-| **LodConstraint** | 4 | **ToolExposure** | 1 |
-| **Script** | 4 |  |  |
+| **Addressable** | 6 | **EditorFocus** | 2 |
+| **Audio** | 6 | **EditorWindowInteraction** | 2 |
+| **Code** | 6 | **Material** | 2 |
+| **InputActions** | 6 | **Performance** | 2 |
+| **NavMesh** | 6 | **ProjectSettings** | 2 |
+| **Shader** | 6 | **References** | 2 |
+| **File** | 5 | **Batch** | 1 |
+| **MemorySnapshot** | 5 | **Hierarchy** | 1 |
+| **SceneView** | 5 | **Interop** | 1 |
+| **Screenshot** | 5 | **MenuItem** | 1 |
+| **Volume** | 5 | **Mesh** | 1 |
+| **Camera** | 4 | **Particle** | 1 |
+| **Compilation** | 4 | **Reflection** | 1 |
+| **LodConstraint** | 4 | **Timeline** | 1 |
+| **Script** | 4 | **ToolExposure** | 1 |
 
 > 📖 每个工具及其说明见 [TOOLS.md](TOOLS.md)。
 <!-- tools-summary:end -->
