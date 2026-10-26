@@ -260,6 +260,7 @@ namespace KitWright.Editor.Tests
                 EditorFocusState before = null;
                 var priorForeground = 0;
                 var stableSamples = 0;
+                var stableSince = 0d;
                 while (EditorApplication.timeSinceStartup < deadline)
                 {
                     yield return null;
@@ -269,13 +270,14 @@ namespace KitWright.Editor.Tests
                     Assert.AreEqual(initial.projectPath, before.projectPath);
                     if (before.foregroundPid > 0 && before.foregroundPid != before.editorPid && !before.nativeWindowFocused)
                     {
-                        stableSamples = before.foregroundPid == priorForeground ? stableSamples + 1 : 1;
+                        if (before.foregroundPid == priorForeground) stableSamples++;
+                        else { stableSamples = 1; stableSince = EditorApplication.timeSinceStartup; }
                         priorForeground = before.foregroundPid;
-                        if (stableSamples >= 2) break;
+                        if (stableSamples >= 2 && EditorApplication.timeSinceStartup - stableSince >= 0.25) break;
                     }
                     else { stableSamples = 0; priorForeground = 0; }
                 }
-                if (stableSamples < 2)
+                if (stableSamples < 2 || EditorApplication.timeSinceStartup - stableSince < 0.25)
                     Assert.Ignore("No stable external foreground was observed; focus commands were not tested.");
                 Debug.Log("FOCUS_NATIVE_PRECONDITION: " + Json(before));
                 var app = EditorFocusFunctions.FocusUnityEditor();
