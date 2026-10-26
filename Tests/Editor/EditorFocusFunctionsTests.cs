@@ -253,6 +253,7 @@ namespace KitWright.Editor.Tests
                 var initial = backend.Capture();
                 Assert.IsNull(initial.observationError);
                 Assert.IsFalse(initial.modal, "Close any modal before this owned test.");
+                Debug.Log("FOCUS_NATIVE_INITIAL_STATE: " + Json(initial));
                 Debug.Log("FOCUS_NATIVE_READY: backgrounding only this disposable Editor; no input is sent.");
                 var backgroundRequestAccepted = NativeFocusTestWindow.BackgroundCurrentEditor();
                 Debug.Log("FOCUS_NATIVE_BACKGROUND_REQUEST: accepted=" + backgroundRequestAccepted);
@@ -278,8 +279,11 @@ namespace KitWright.Editor.Tests
                     else { stableSamples = 0; priorForeground = 0; }
                 }
                 if (stableSamples < 2 || EditorApplication.timeSinceStartup - stableSince < 0.25)
+                {
+                    Debug.Log("FOCUS_NATIVE_PRECONDITION_UNMET: " + Json(before));
                     Assert.Ignore("No stable external foreground was observed; focus commands were not tested. " +
                         "Background request accepted=" + backgroundRequestAccepted);
+                }
                 Debug.Log("FOCUS_NATIVE_PRECONDITION: " + Json(before));
                 var app = EditorFocusFunctions.FocusUnityEditor();
                 while (!app.IsCompleted) yield return null;
