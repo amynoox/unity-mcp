@@ -6,6 +6,8 @@
 - `focus_unity_editor` and `focus_game_view`: current-Editor-only native Windows/macOS activation and Game View keyboard focus, with post-request verification on two later Editor updates. Both are available in minimal/core profiles. They report OS refusal, busy/modal/headless state, ambiguous or missing Game Views, and timeouts without claiming input readiness. `get_editor_state` now includes native focus observations. No shell, injected input, permission change, session unlock, or arbitrary process target is used.
 
 ### Fixed
+- Focus requests now verify later native observations even when an activation call returns false. macOS restores only its own hidden Editor and retains the no-launch contract; OS refusal remains a failure with a recovery hint for authorized Computer Use on the existing Editor.
+- Native focus qualification records unassisted activation and already-foreground/Computer Use-assisted verification separately. CI and CodeQL validation are manual-only so LAN validation remains the default.
 - Broker mode acknowledges accepted MCP notifications with HTTP 202 and an empty body. Previously `notifications/initialized` received a synthetic JSON-RPC result with a null ID, preventing strict Streamable HTTP clients from completing a fresh connection. Broker protocol v8 replaces an existing v7 process so the corrected status forwarding takes effect after a package update. Notification acknowledgments do not consume pending SSE tool-list changes.
 
 ### Added

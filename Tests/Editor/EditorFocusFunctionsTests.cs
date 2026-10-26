@@ -73,7 +73,9 @@ namespace KitWright.Editor.Tests
             if (field == "busy") backend.State.busy = true;
             if (field == "modal") backend.State.modal = true;
             if (field == "unsupported") backend.State.supported = false;
-            Assert.AreEqual(code, (string)Run(backend)["code"]);
+            var result = Run(backend);
+            Assert.AreEqual(code, (string)result["code"]);
+            Assert.IsNull((string)result["data"]["recoveryHint"], "Unsafe guards must not suggest a focus retry.");
             Assert.Zero(backend.Activations);
             Assert.Zero(backend.Focuses);
         }
@@ -91,9 +93,49 @@ namespace KitWright.Editor.Tests
         public void RefusedActivationIsNotRetried()
         {
             var backend = new Backend { ActivateAllowed = false };
-            Assert.AreEqual("FOREGROUND_REQUEST_REFUSED", (string)Run(backend)["code"]);
+            var result = Run(backend);
+            Assert.AreEqual("FOREGROUND_REQUEST_REFUSED", (string)result["code"]);
+            StringAssert.Contains("same existing Editor", (string)result["data"]["recoveryHint"]);
             Assert.AreEqual(1, backend.Activations);
             Assert.Zero(backend.Focuses);
+            Assert.AreEqual(10, backend.Updates, "A false request return still needs bounded native observation.");
+        }
+
+        [Test]
+        public void FalseActivationReturnWithDelayedNativeFocusCanPass()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) =>
+            {
+                if (n >= 3) b.State.foregroundPid = 42;
+            } };
+            var result = Run(backend);
+            Assert.IsTrue((bool)result["success"]);
+            Assert.IsFalse((bool)result["data"]["activationRequestAccepted"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(4, backend.Updates);
+            Assert.IsFalse((bool)result["data"]["inputVerified"]);
+        }
+
+        [Test]
+        public void FalseActivationReturnWithOnlyOneNativeSampleDoesNotPass()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) =>
+            {
+                if (n == 10) b.State.foregroundPid = 42;
+            } };
+            var result = Run(backend);
+            Assert.IsFalse((bool)result["success"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(10, backend.Updates);
+        }
+
+        [Test]
+        public void FalseActivationReturnDoesNotBypassLaterModalGuard()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) => b.State.modal = true };
+            Assert.AreEqual("EDITOR_MODAL_BLOCKED", (string)Run(backend)["code"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(1, backend.Updates);
         }
 
         [Test]
@@ -191,6 +233,21 @@ namespace KitWright.Editor.Tests
         }
 
         [Test]
+        public void FalseGameViewReturnWithObservedKeyboardFocusCanPass()
+        {
+            var backend = new Backend { FocusAllowed = false, Tick = (n, b) =>
+            {
+                if (n >= 2) b.State.gameViewFocused = true;
+            } };
+            backend.State.foregroundPid = 42;
+            var result = Run(backend, true);
+            Assert.IsTrue((bool)result["success"]);
+            Assert.IsFalse((bool)result["data"]["gameViewRequestAccepted"]);
+            Assert.AreEqual(1, backend.Focuses);
+            Assert.AreEqual(3, backend.Updates);
+        }
+
+        [Test]
         public void LosingForegroundAfterGameViewRequestDoesNotReclaimIt()
         {
             var backend = new Backend { Tick = (n, b) => { if (n == 2) b.State.foregroundPid = 7; } };
@@ -222,6 +279,7 @@ namespace KitWright.Editor.Tests
             var backend = new Backend { FocusAllowed = false };
             backend.State.foregroundPid = 42;
             Assert.AreEqual("GAME_VIEW_FOCUS_REFUSED", (string)Run(backend, true)["code"]);
+            Assert.AreEqual(10, backend.Updates);
             Assert.AreEqual(1, backend.Focuses);
         }
 
@@ -237,7 +295,35 @@ namespace KitWright.Editor.Tests
             }
         }
 
-        [UnityTest, Explicit("Owned interactive disposable project only; owner must select another app during the initial delay.")]
+        [UnityTest, Explicit("Owned interactive disposable project only; Computer Use must first focus this existing Editor.")]
+        public IEnumerator NativeFocusCommandsVerifyExistingForegroundAndGameView()
+        {
+            if (Application.isBatchMode ||
+                (Application.platform != RuntimePlatform.WindowsEditor && Application.platform != RuntimePlatform.OSXEditor))
+                Assert.Ignore("Requires an interactive Windows/macOS Editor.");
+            var before = new NativeEditorFocus().Capture();
+            Assert.IsNull(before.observationError);
+            Assert.IsFalse(before.modal);
+            Assert.IsTrue(before.ForegroundVerified,
+                "Authorized Computer Use must first focus this existing Editor; this test never launches it.");
+            Assert.AreEqual(1, before.gameViewCount, "Use one existing Game View.");
+            Debug.Log("FOCUS_EXISTING_FOREGROUND_INITIAL: " + Json(before));
+            var editor = EditorFocusFunctions.FocusUnityEditor();
+            while (!editor.IsCompleted) yield return null;
+            var editorResult = Json(editor.GetAwaiter().GetResult());
+            Debug.Log("FOCUS_EXISTING_EDITOR_RESULT: " + editorResult);
+            Assert.IsTrue((bool)editorResult["success"], editorResult.ToString());
+            Assert.IsFalse((bool)editorResult["data"]["activationRequested"]);
+            var game = EditorFocusFunctions.FocusGameView();
+            while (!game.IsCompleted) yield return null;
+            var gameResult = Json(game.GetAwaiter().GetResult());
+            Assert.IsTrue((bool)gameResult["success"], gameResult.ToString());
+            Assert.IsTrue((bool)gameResult["data"]["after"]["gameViewFocused"]);
+            Assert.IsFalse((bool)gameResult["data"]["activationRequested"]);
+            Debug.Log("FOCUS_EXISTING_FOREGROUND_VERIFIED: " + gameResult);
+        }
+
+        [UnityTest, Explicit("Owned interactive disposable project only; test temporarily backgrounds this Editor.")]
         public IEnumerator NativeFocusCommandsVerifyActualForegroundAndGameView()
         {
             if (Application.isBatchMode ||
@@ -246,18 +332,49 @@ namespace KitWright.Editor.Tests
             var type = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
             Assert.IsNotNull(type);
             var prior = Resources.FindObjectsOfTypeAll<EditorWindow>().Where(w => w.GetType() == type).ToArray();
-            if (prior.Length > 1) Assert.Ignore("Use a disposable layout with one Game View.");
-            var window = prior.Length == 1 ? prior[0] : EditorWindow.GetWindow(type);
+            if (prior.Length != 1) Assert.Ignore("Use a disposable layout with one existing Game View.");
             try
             {
-                Debug.Log("FOCUS_NATIVE_READY: select another application now; no input will be sent to it.");
-                var deadline = EditorApplication.timeSinceStartup + 8;
-                while (EditorApplication.timeSinceStartup < deadline) yield return null;
-                var before = new NativeEditorFocus().Capture();
-                if (before.ForegroundVerified) Assert.Ignore("Another app must be foreground to test actual OS activation.");
+                var backend = new NativeEditorFocus();
+                var initial = backend.Capture();
+                Assert.IsNull(initial.observationError);
+                Assert.IsFalse(initial.modal, "Close any modal before this owned test.");
+                Debug.Log("FOCUS_NATIVE_INITIAL_STATE: " + Json(initial));
+                Debug.Log("FOCUS_NATIVE_READY: backgrounding only this disposable Editor; no input is sent.");
+                var backgroundRequestAccepted = NativeFocusTestWindow.BackgroundCurrentEditor();
+                Debug.Log("FOCUS_NATIVE_BACKGROUND_REQUEST: accepted=" + backgroundRequestAccepted);
+                var deadline = EditorApplication.timeSinceStartup + 10;
+                EditorFocusState before = null;
+                var priorForeground = 0;
+                var stableSamples = 0;
+                var stableSince = 0d;
+                while (EditorApplication.timeSinceStartup < deadline)
+                {
+                    yield return null;
+                    before = backend.Capture();
+                    Assert.IsNull(before.observationError);
+                    Assert.AreEqual(initial.editorPid, before.editorPid);
+                    Assert.AreEqual(initial.projectPath, before.projectPath);
+                    if (before.foregroundPid > 0 && before.foregroundPid != before.editorPid && !before.nativeWindowFocused)
+                    {
+                        if (before.foregroundPid == priorForeground) stableSamples++;
+                        else { stableSamples = 1; stableSince = EditorApplication.timeSinceStartup; }
+                        priorForeground = before.foregroundPid;
+                        if (stableSamples >= 2 && EditorApplication.timeSinceStartup - stableSince >= 0.25) break;
+                    }
+                    else { stableSamples = 0; priorForeground = 0; }
+                }
+                if (stableSamples < 2 || EditorApplication.timeSinceStartup - stableSince < 0.25)
+                {
+                    Debug.Log("FOCUS_NATIVE_PRECONDITION_UNMET: " + Json(before));
+                    Assert.Ignore("No stable external foreground was observed; focus commands were not tested. " +
+                        "Background request accepted=" + backgroundRequestAccepted);
+                }
+                Debug.Log("FOCUS_NATIVE_PRECONDITION: " + Json(before));
                 var app = EditorFocusFunctions.FocusUnityEditor();
                 while (!app.IsCompleted) yield return null;
                 var appResult = Json(app.GetAwaiter().GetResult());
+                Debug.Log("FOCUS_NATIVE_EDITOR_RESULT: " + appResult);
                 Assert.IsTrue((bool)appResult["success"], appResult.ToString());
                 var game = EditorFocusFunctions.FocusGameView();
                 while (!game.IsCompleted) yield return null;
@@ -266,7 +383,12 @@ namespace KitWright.Editor.Tests
                 Assert.IsTrue((bool)gameResult["data"]["after"]["gameViewFocused"]);
                 Debug.Log("FOCUS_NATIVE_VERIFIED: " + gameResult);
             }
-            finally { if (prior.Length == 0 && window != null) window.Close(); }
+            finally
+            {
+                // Cleanup is separate from the assertions and cannot turn an
+                // ignored/failed run into evidence that the commands passed.
+                NativeFocusTestWindow.RestoreCurrentEditorForCleanup();
+            }
         }
     }
 }

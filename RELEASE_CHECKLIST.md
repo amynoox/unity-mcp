@@ -43,7 +43,35 @@ window. Batchmode will not do, since it skips these tests too.
 - [ ] `HotReloadInteropTests` (SingularityGroup Hot Reload installed), and the Volume tools' tests (URP installed)
 - [ ] `InputSimulationFunctionsTests` mouse drag, touch and gamepad (a Game View to route device input to)
 - [ ] `PowerThrottlingTests` (Windows)
-- [ ] `EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView` (owned interactive Windows and macOS; actual foreground and Game View focus)
+- [ ] `EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView` (owned interactive Windows; unassisted foreground and Game View focus; record macOS refusal separately)
+- [ ] `EditorFocusFunctionsTests.NativeFocusCommandsVerifyExistingForegroundAndGameView` (owned interactive macOS and Windows; authorized Computer Use first focuses the existing Editor, then both native tools verify focus)
+
+The opt-in focus test temporarily minimizes (Windows) or hides (macOS) only its
+own disposable Editor, then requires two real observations of another foreground
+process before testing the production commands. It does not depend on a timed
+click in another application. Keep the READY, PRECONDITION, EDITOR_RESULT and
+VERIFIED records with the native result. An OS refusal, missing precondition or
+ignored result is not a pass. Cleanup may restore the same Editor but cannot
+change the recorded test outcome. This fixture proof is separate from calling
+the configured MCP tools and observing physical game input in the pilot.
+The existing-foreground test is a distinct recovery-path test. It does not hide
+the Editor or claim native activation from a background state. Preserve both its
+Computer Use preparation evidence and native results, alongside prior refusals.
+
+The production workflow records native request return values separately from
+observed focus. It makes one request and uses the same bounded verification even
+when that request returns false; it never retries activation or accepts a request
+return as proof. A real refusal with no verified focus still fails.
+
+On macOS the request restores only this Editor if hidden, uses normal AppKit
+self-activation and makes its existing main/key window key. It never changes
+activation policy, targets another application, launches an Editor, or requests
+an OS security exception. The snapshot records main-thread, hidden and activation
+policy state for diagnosis. Modern macOS may decline cooperative activation;
+that remains a failed focus result unless later native samples prove otherwise.
+Hidden-window lookup occurs after the unhide/activation request; temporarily absent
+main/key windows do not short-circuit that request. Success still requires the
+same later native key-window observations, not merely an issued unhide request.
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
 Record all skips and their actual environmental reasons; never count them as

@@ -1,13 +1,7 @@
 name: CodeQL
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-    schedule:
-        # Weekly, so a new query release finds old code without waiting for a push.
-        - cron: "0 3 * * 1"
+    # Validation uses the LAN. A hosted scan needs explicit maintainer permission.
     workflow_dispatch:
 
 jobs:
