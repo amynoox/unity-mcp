@@ -94,6 +94,44 @@ namespace KitWright.Editor.Tests
             Assert.AreEqual("FOREGROUND_REQUEST_REFUSED", (string)Run(backend)["code"]);
             Assert.AreEqual(1, backend.Activations);
             Assert.Zero(backend.Focuses);
+            Assert.AreEqual(10, backend.Updates, "A false request return still needs bounded native observation.");
+        }
+
+        [Test]
+        public void FalseActivationReturnWithDelayedNativeFocusCanPass()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) =>
+            {
+                if (n >= 3) b.State.foregroundPid = 42;
+            } };
+            var result = Run(backend);
+            Assert.IsTrue((bool)result["success"]);
+            Assert.IsFalse((bool)result["data"]["activationRequestAccepted"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(4, backend.Updates);
+            Assert.IsFalse((bool)result["data"]["inputVerified"]);
+        }
+
+        [Test]
+        public void FalseActivationReturnWithOnlyOneNativeSampleDoesNotPass()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) =>
+            {
+                if (n == 10) b.State.foregroundPid = 42;
+            } };
+            var result = Run(backend);
+            Assert.IsFalse((bool)result["success"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(10, backend.Updates);
+        }
+
+        [Test]
+        public void FalseActivationReturnDoesNotBypassLaterModalGuard()
+        {
+            var backend = new Backend { ActivateAllowed = false, Tick = (n, b) => b.State.modal = true };
+            Assert.AreEqual("EDITOR_MODAL_BLOCKED", (string)Run(backend)["code"]);
+            Assert.AreEqual(1, backend.Activations);
+            Assert.AreEqual(1, backend.Updates);
         }
 
         [Test]
@@ -191,6 +229,21 @@ namespace KitWright.Editor.Tests
         }
 
         [Test]
+        public void FalseGameViewReturnWithObservedKeyboardFocusCanPass()
+        {
+            var backend = new Backend { FocusAllowed = false, Tick = (n, b) =>
+            {
+                if (n >= 2) b.State.gameViewFocused = true;
+            } };
+            backend.State.foregroundPid = 42;
+            var result = Run(backend, true);
+            Assert.IsTrue((bool)result["success"]);
+            Assert.IsFalse((bool)result["data"]["gameViewRequestAccepted"]);
+            Assert.AreEqual(1, backend.Focuses);
+            Assert.AreEqual(3, backend.Updates);
+        }
+
+        [Test]
         public void LosingForegroundAfterGameViewRequestDoesNotReclaimIt()
         {
             var backend = new Backend { Tick = (n, b) => { if (n == 2) b.State.foregroundPid = 7; } };
@@ -222,6 +275,7 @@ namespace KitWright.Editor.Tests
             var backend = new Backend { FocusAllowed = false };
             backend.State.foregroundPid = 42;
             Assert.AreEqual("GAME_VIEW_FOCUS_REFUSED", (string)Run(backend, true)["code"]);
+            Assert.AreEqual(10, backend.Updates);
             Assert.AreEqual(1, backend.Focuses);
         }
 

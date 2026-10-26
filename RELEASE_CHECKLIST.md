@@ -53,6 +53,11 @@ VERIFIED records with the native result. An OS refusal, missing precondition or
 ignored result is not a pass. Cleanup may restore the same Editor but cannot
 change the recorded test outcome. This fixture proof is separate from calling
 the configured MCP tools and observing physical game input in the pilot.
+
+The production workflow records native request return values separately from
+observed focus. It makes one request and uses the same bounded verification even
+when that request returns false; it never retries activation or accepts a request
+return as proof. A real refusal with no verified focus still fails.
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
 Record all skips and their actual environmental reasons; never count them as

@@ -47,10 +47,13 @@ namespace KitWright.Editor.Tools.Helpers
             var before = backend.Capture();
             var after = before;
             bool activationRequested = false, gameViewRequested = false;
+            bool? activationRequestAccepted = null, gameViewRequestAccepted = null;
+            string activationReason = null, gameViewReason = null;
             var started = backend.ElapsedMilliseconds;
             object Failure(string code, string reason = null) => Response.Error(code, new
             {
-                before, after, activationRequested, gameViewRequested, reason,
+                before, after, activationRequested, gameViewRequested,
+                activationRequestAccepted, gameViewRequestAccepted, activationReason, gameViewReason, reason,
                 inputVerified = false
             });
 
@@ -74,15 +77,14 @@ namespace KitWright.Editor.Tools.Helpers
             if (!before.ForegroundVerified)
             {
                 activationRequested = true;
-                if (!backend.RequestApplicationFocus(out var reason))
-                    return Failure("FOREGROUND_REQUEST_REFUSED", reason);
+                activationRequestAccepted = backend.RequestApplicationFocus(out activationReason);
             }
 
             int stableObservations = 0;
             while (backend.ElapsedMilliseconds - started < timeoutMs)
             {
-                // Always read on a later editor update; a successful request is not evidence
-                // that the OS or the Game View has accepted keyboard focus.
+                // A request return value is not settled native state, whether true or false.
+                // Observe later updates without retrying; success still needs two real samples.
                 await backend.WaitForUpdate();
                 after = backend.Capture();
                 refused = Guard(after);
@@ -92,8 +94,7 @@ namespace KitWright.Editor.Tools.Helpers
                 if (gameView && !gameViewRequested && after.ForegroundVerified)
                 {
                     gameViewRequested = true;
-                    if (!backend.RequestGameViewFocus(out var reason))
-                        return Failure("GAME_VIEW_FOCUS_REFUSED", reason);
+                    gameViewRequestAccepted = backend.RequestGameViewFocus(out gameViewReason);
                     stableObservations = 0;
                     continue;
                 }
@@ -107,11 +108,16 @@ namespace KitWright.Editor.Tools.Helpers
                     return Response.Success(gameView ? "Game View focus verified." : "Unity foreground verified.", new
                     {
                         before, after, activationRequested, gameViewRequested,
+                        activationRequestAccepted, gameViewRequestAccepted, activationReason, gameViewReason,
                         foregroundVerified = true, gameViewFocusVerified = gameView && after.gameViewFocused,
                         inputVerified = false
                     }, "Focus is not proof that the game consumed input. Verify a causal input response separately.");
             }
 
+            if (activationRequestAccepted == false && !after.ForegroundVerified)
+                return Failure("FOREGROUND_REQUEST_REFUSED", activationReason);
+            if (gameViewRequestAccepted == false && after.ForegroundVerified && !after.gameViewFocused)
+                return Failure("GAME_VIEW_FOCUS_REFUSED", gameViewReason);
             return Failure(gameView && after.ForegroundVerified ? "GAME_VIEW_FOCUS_TIMEOUT" : "EDITOR_FOREGROUND_TIMEOUT");
         }
     }
