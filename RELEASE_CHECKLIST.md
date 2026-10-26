@@ -58,6 +58,13 @@ The production workflow records native request return values separately from
 observed focus. It makes one request and uses the same bounded verification even
 when that request returns false; it never retries activation or accepts a request
 return as proof. A real refusal with no verified focus still fails.
+
+On macOS the request restores only this Editor if hidden, uses normal AppKit
+self-activation and makes its existing main/key window key. It never changes
+activation policy, targets another application, launches an Editor, or requests
+an OS security exception. The snapshot records main-thread, hidden and activation
+policy state for diagnosis. Modern macOS may decline cooperative activation;
+that remains a failed focus result unless later native samples prove otherwise.
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
 Record all skips and their actual environmental reasons; never count them as

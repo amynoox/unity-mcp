@@ -18,6 +18,9 @@ namespace KitWright.Editor.Tools.Helpers
         public bool modal;
         public int foregroundPid;
         public bool nativeWindowFocused;
+        public bool? nativeMainThread;
+        public bool? nativeApplicationHidden;
+        public int? nativeActivationPolicy;
         public bool applicationFocused;
         public string focusedWindowType;
         public int gameViewCount;
