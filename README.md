@@ -54,6 +54,15 @@ timeout, inspect current state before deciding whether an operation may be
 retried. Focus evidence does not prove that a game consumed input; perform the
 separate owned input check before live QA.
 
+macOS may refuse an Editor's request to activate itself. In that case, use the
+authorized Computer Use connection to bring the **same existing Unity window**
+forward, verify the connected project and process again, and call the focus tools.
+This is the shared no-launch recovery path: no application-opening API, replacement
+Editor, permission change, or authentication automation. An OS-refused native
+attempt remains a failure; a later Computer Use-assisted result is recorded
+separately. If desktop access is unavailable, report that blocker rather than
+claiming focus or readiness.
+
 If you just want to get connected fast, do these three things:
 
 - Install the Unity package from the Git URL

@@ -73,7 +73,9 @@ namespace KitWright.Editor.Tests
             if (field == "busy") backend.State.busy = true;
             if (field == "modal") backend.State.modal = true;
             if (field == "unsupported") backend.State.supported = false;
-            Assert.AreEqual(code, (string)Run(backend)["code"]);
+            var result = Run(backend);
+            Assert.AreEqual(code, (string)result["code"]);
+            Assert.IsNull((string)result["data"]["recoveryHint"], "Unsafe guards must not suggest a focus retry.");
             Assert.Zero(backend.Activations);
             Assert.Zero(backend.Focuses);
         }
@@ -91,7 +93,9 @@ namespace KitWright.Editor.Tests
         public void RefusedActivationIsNotRetried()
         {
             var backend = new Backend { ActivateAllowed = false };
-            Assert.AreEqual("FOREGROUND_REQUEST_REFUSED", (string)Run(backend)["code"]);
+            var result = Run(backend);
+            Assert.AreEqual("FOREGROUND_REQUEST_REFUSED", (string)result["code"]);
+            StringAssert.Contains("same existing Editor", (string)result["data"]["recoveryHint"]);
             Assert.AreEqual(1, backend.Activations);
             Assert.Zero(backend.Focuses);
             Assert.AreEqual(10, backend.Updates, "A false request return still needs bounded native observation.");
@@ -289,6 +293,34 @@ namespace KitWright.Editor.Tests
                 CollectionAssert.Contains(MCPToolExportPolicy.DefaultMinimalTools.ToArray(), name);
                 CollectionAssert.Contains(MCPToolExportPolicy.DefaultCoreTools.ToArray(), name);
             }
+        }
+
+        [UnityTest, Explicit("Owned interactive disposable project only; Computer Use must first focus this existing Editor.")]
+        public IEnumerator NativeFocusCommandsVerifyExistingForegroundAndGameView()
+        {
+            if (Application.isBatchMode ||
+                (Application.platform != RuntimePlatform.WindowsEditor && Application.platform != RuntimePlatform.OSXEditor))
+                Assert.Ignore("Requires an interactive Windows/macOS Editor.");
+            var before = new NativeEditorFocus().Capture();
+            Assert.IsNull(before.observationError);
+            Assert.IsFalse(before.modal);
+            Assert.IsTrue(before.ForegroundVerified,
+                "Authorized Computer Use must first focus this existing Editor; this test never launches it.");
+            Assert.AreEqual(1, before.gameViewCount, "Use one existing Game View.");
+            Debug.Log("FOCUS_EXISTING_FOREGROUND_INITIAL: " + Json(before));
+            var editor = EditorFocusFunctions.FocusUnityEditor();
+            while (!editor.IsCompleted) yield return null;
+            var editorResult = Json(editor.GetAwaiter().GetResult());
+            Debug.Log("FOCUS_EXISTING_EDITOR_RESULT: " + editorResult);
+            Assert.IsTrue((bool)editorResult["success"], editorResult.ToString());
+            Assert.IsFalse((bool)editorResult["data"]["activationRequested"]);
+            var game = EditorFocusFunctions.FocusGameView();
+            while (!game.IsCompleted) yield return null;
+            var gameResult = Json(game.GetAwaiter().GetResult());
+            Assert.IsTrue((bool)gameResult["success"], gameResult.ToString());
+            Assert.IsTrue((bool)gameResult["data"]["after"]["gameViewFocused"]);
+            Assert.IsFalse((bool)gameResult["data"]["activationRequested"]);
+            Debug.Log("FOCUS_EXISTING_FOREGROUND_VERIFIED: " + gameResult);
         }
 
         [UnityTest, Explicit("Owned interactive disposable project only; test temporarily backgrounds this Editor.")]

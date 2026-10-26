@@ -10,7 +10,7 @@ namespace KitWright.Editor.Tools.Builtins
     internal static class EditorFocusFunctions
     {
         [Description("Request OS foreground activation of this connected Unity Editor only, then verify its PID on two later editor updates. " +
-                     "Windows/macOS only. Refuses batch mode, busy Editors, modal windows and OS denial. Does not unlock, send input, change permissions or prove game readiness.")]
+                     "Windows/macOS only. Refuses batch mode, busy Editors, modal windows and OS denial. On OS refusal use authorized Computer Use to focus this existing Editor, then verify again. Never launches an Editor, unlocks, sends input, changes permissions or proves game readiness.")]
         public static Task<object> FocusUnityEditor(
             [ToolParam("Verification timeout in milliseconds, 100-5000.", Required = false)] int timeout_ms = 2000)
             => Run(false, timeout_ms);

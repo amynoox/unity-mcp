@@ -57,6 +57,11 @@ namespace KitWright.Editor.Tools.Helpers
             {
                 before, after, activationRequested, gameViewRequested,
                 activationRequestAccepted, gameViewRequestAccepted, activationReason, gameViewReason, reason,
+                recoveryHint = code == "FOREGROUND_REQUEST_REFUSED" || code == "EDITOR_FOREGROUND_TIMEOUT"
+                    ? "Use authorized Computer Use to bring this same existing Editor window forward. " +
+                      "Do not launch another Editor or change permissions. Recheck ownership and native focus " +
+                      "before calling the focus tools again; stop at authentication or unexpected dialogs."
+                    : null,
                 inputVerified = false
             });
 

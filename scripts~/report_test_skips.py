@@ -44,6 +44,8 @@ EXPECTED_NAMED_SKIPS = {
     "KitWright.Editor.Tests.EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView":
         ("Owned interactive disposable project only; owner must select another app during the initial delay.",
          "Owned interactive disposable project only; test temporarily backgrounds this Editor."),
+    "KitWright.Editor.Tests.EditorFocusFunctionsTests.NativeFocusCommandsVerifyExistingForegroundAndGameView":
+        ("Owned interactive disposable project only; Computer Use must first focus this existing Editor.",),
 }
 
 

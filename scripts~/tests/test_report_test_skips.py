@@ -52,6 +52,16 @@ class ReportTestSkipsTests(unittest.TestCase):
     def test_changed_focus_reason_is_not_allowed(self):
         self.assertEqual(1, self.report(reason="Unexpected interruption").returncode)
 
+    def test_existing_foreground_qualification_stays_separate_and_deferred(self):
+        name = "KitWright.Editor.Tests.EditorFocusFunctionsTests.NativeFocusCommandsVerifyExistingForegroundAndGameView"
+        reason = "Owned interactive disposable project only; Computer Use must first focus this existing Editor."
+        report = self.report(name=name, reason=reason)
+        self.assertEqual(0, report.returncode, report.stdout + report.stderr)
+        self.assertIn("0 passed", report.stdout)
+        self.assertIn("not passes", report.stdout)
+        self.assertEqual(1, self.report(name=FOCUS, reason=reason).returncode)
+        self.assertEqual(1, self.report(name=name, reason=reason, result="Inconclusive", skipped=0, inconclusive=1).returncode)
+
     def test_explicit_reason_does_not_hide_an_inconclusive_focus_test(self):
         self.assertEqual(1, self.report(result="Inconclusive", skipped=0, inconclusive=1).returncode)
 
