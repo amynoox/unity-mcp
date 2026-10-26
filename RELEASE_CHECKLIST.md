@@ -59,11 +59,10 @@ observed focus. It makes one request and uses the same bounded verification even
 when that request returns false; it never retries activation or accepts a request
 return as proof. A real refusal with no verified focus still fails.
 
-On macOS the request uses NSWorkspace cooperative activation for the sole running
-Editor at its own bundle URL. It requires exactly one matching running process,
-disables new instances, alternate installations, authentication prompts and Recent
-Items, and never passes documents, arguments or environment overrides. It never
-changes activation policy or requests an OS security exception. The snapshot records main-thread, hidden and activation
+On macOS the request restores only this Editor if hidden, uses normal AppKit
+self-activation and makes its existing main/key window key. It never changes
+activation policy, targets another application, launches an Editor, or requests
+an OS security exception. The snapshot records main-thread, hidden and activation
 policy state for diagnosis. Modern macOS may decline cooperative activation;
 that remains a failed focus result unless later native samples prove otherwise.
 Hidden-window lookup occurs after the unhide/activation request; temporarily absent
