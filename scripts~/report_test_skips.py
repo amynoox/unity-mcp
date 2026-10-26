@@ -42,7 +42,8 @@ EXPECTED = [
 # hide unrelated tests that stopped running. This is a deferred interactive gate, not a pass.
 EXPECTED_NAMED_SKIPS = {
     "KitWright.Editor.Tests.EditorFocusFunctionsTests.NativeFocusCommandsVerifyActualForegroundAndGameView":
-        "Owned interactive disposable project only; owner must select another app during the initial delay.",
+        ("Owned interactive disposable project only; owner must select another app during the initial delay.",
+         "Owned interactive disposable project only; test temporarily backgrounds this Editor."),
 }
 
 
@@ -73,7 +74,7 @@ def main():
             name = case.get("fullname") or case.get("name")
             rows.append((name, case.get("result"), reason))
             named_skip = (case.get("result") == "Skipped" and
-                          EXPECTED_NAMED_SKIPS.get(name) == reason)
+                          reason in EXPECTED_NAMED_SKIPS.get(name, ()))
             if named_skip:
                 deferred.append(name)
             if not named_skip and not any(re.search(pattern, reason, re.IGNORECASE) for pattern in EXPECTED):

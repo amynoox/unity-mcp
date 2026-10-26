@@ -41,6 +41,14 @@ class ReportTestSkipsTests(unittest.TestCase):
         self.assertEqual(1, report.returncode)
         self.assertIn("not in", report.stdout)
 
+    def test_current_explicit_reason_is_still_deferred_not_a_pass(self):
+        reason = "Owned interactive disposable project only; test temporarily backgrounds this Editor."
+        report = self.report(reason=reason)
+        self.assertEqual(0, report.returncode, report.stdout + report.stderr)
+        self.assertIn("0 passed", report.stdout)
+        self.assertIn("Interactive focus qualification is still pending", report.stdout)
+        self.assertEqual(1, self.report(name="Other.Test", reason=reason).returncode)
+
     def test_changed_focus_reason_is_not_allowed(self):
         self.assertEqual(1, self.report(reason="Unexpected interruption").returncode)
 
