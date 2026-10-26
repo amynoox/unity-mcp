@@ -77,15 +77,45 @@ namespace KitWright.Editor.Tools.Helpers
                 { reason = "AppKit focus requires the Editor main thread."; return false; }
                 var app = SendPointer(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
                 if (app == IntPtr.Zero) { reason = "This Editor has no native application."; return false; }
-                // Restore only our hidden Editor. Use AppKit's normal self-activation,
-                // never an arbitrary process or an ignored/forced activation option.
+                var runningClass = objc_getClass("NSRunningApplication");
+                var current = SendPointer(runningClass, sel_registerName("currentApplication"));
+                var bundle = SendPointer(current, sel_registerName("bundleIdentifier"));
+                var url = SendPointer(current, sel_registerName("bundleURL"));
+                if (bundle == IntPtr.Zero || url == IntPtr.Zero)
+                { reason = "This Editor has no native bundle identity."; return false; }
+                var instances = SendPointerArgument(runningClass,
+                    sel_registerName("runningApplicationsWithBundleIdentifier:"), bundle);
+                if (instances == IntPtr.Zero || SendUnsigned(instances, sel_registerName("count")).ToUInt64() != 1 ||
+                    SendInt(SendPointerIndex(instances, sel_registerName("objectAtIndex:"), UIntPtr.Zero),
+                        sel_registerName("processIdentifier")) != CurrentPid())
+                { reason = "Existing Editor activation is ambiguous; no workspace request was sent."; return false; }
+                var workspace = SendPointer(objc_getClass("NSWorkspace"), sel_registerName("sharedWorkspace"));
+                var open = sel_registerName("openApplicationAtURL:configuration:completionHandler:");
+                var configurationClass = objc_getClass("NSWorkspaceOpenConfiguration");
+                if (configurationClass == IntPtr.Zero || workspace == IntPtr.Zero ||
+                    !SendBoolArgument(workspace, sel_registerName("respondsToSelector:"), open))
+                { reason = "Existing-instance workspace activation is unavailable."; return false; }
+                var configuration = SendPointer(configurationClass, sel_registerName("configuration"));
+                if (configuration == IntPtr.Zero)
+                { reason = "Existing-instance workspace configuration is unavailable."; return false; }
+                foreach (var setter in new[] { "setCreatesNewApplicationInstance:",
+                    "setAllowsRunningApplicationSubstitution:", "setPromptsUserIfNeeded:",
+                    "setAddsToRecentItems:", "setHides:", "setHidesOthers:", "setActivates:" })
+                    if (!SendBoolArgument(configuration, sel_registerName("respondsToSelector:"), sel_registerName(setter)))
+                    { reason = "A required existing-instance workspace guard is unavailable."; return false; }
+                // NSWorkspace supplies cooperative activation context. Select the sole
+                // already-running Editor at its own bundle URL, never a new instance,
+                // another installation, a document, arguments, or an authentication UI.
+                SendVoidBool(configuration, sel_registerName("setCreatesNewApplicationInstance:"), false);
+                SendVoidBool(configuration, sel_registerName("setAllowsRunningApplicationSubstitution:"), false);
+                SendVoidBool(configuration, sel_registerName("setPromptsUserIfNeeded:"), false);
+                SendVoidBool(configuration, sel_registerName("setAddsToRecentItems:"), false);
+                SendVoidBool(configuration, sel_registerName("setHides:"), false);
+                SendVoidBool(configuration, sel_registerName("setHidesOthers:"), false);
+                SendVoidBool(configuration, sel_registerName("setActivates:"), true);
                 if (SendBool(app, sel_registerName("isHidden")))
-                    SendVoidArgument(app, sel_registerName("unhide:"), IntPtr.Zero);
-                var activate = sel_registerName("activate");
-                if (SendBoolArgument(app, sel_registerName("respondsToSelector:"), activate))
-                    SendVoid(app, activate); // macOS 14+ cooperative activation.
-                else
-                    SendVoidBool(app, sel_registerName("activateIgnoringOtherApps:"), false);
+                    SendVoid(app, sel_registerName("unhideWithoutActivation"));
+                SendVoidThreeArguments(workspace, open, url, configuration, IntPtr.Zero);
                 // A hidden app may have neither window until AppKit processes the
                 // unhide request. Do not refuse before unhide, or require a synchronous
                 // restoration: later observations still have to verify a key window.
@@ -182,6 +212,14 @@ namespace KitWright.Editor.Tools.Helpers
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static extern bool SendBoolArgument(IntPtr receiver, IntPtr selector, IntPtr argument);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern IntPtr SendPointerArgument(IntPtr receiver, IntPtr selector, IntPtr argument);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern UIntPtr SendUnsigned(IntPtr receiver, IntPtr selector);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern IntPtr SendPointerIndex(IntPtr receiver, IntPtr selector, UIntPtr index);
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern void SendVoidThreeArguments(IntPtr receiver, IntPtr selector, IntPtr first, IntPtr second, IntPtr third);
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
         private static extern void SendVoid(IntPtr receiver, IntPtr selector);
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
