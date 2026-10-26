@@ -65,6 +65,9 @@ activation policy, targets another application, launches an Editor, or requests
 an OS security exception. The snapshot records main-thread, hidden and activation
 policy state for diagnosis. Modern macOS may decline cooperative activation;
 that remains a failed focus result unless later native samples prove otherwise.
+Hidden-window lookup occurs after the unhide/activation request; temporarily absent
+main/key windows do not short-circuit that request. Success still requires the
+same later native key-window observations, not merely an issued unhide request.
 - [ ] Add-on: `UIReconstructToolsTests`, the whole match pipeline (graphics device), and `RuntimeToolsPlayModeTests` drag and scroll (a screen larger than 640x480)
 
 Record all skips and their actual environmental reasons; never count them as

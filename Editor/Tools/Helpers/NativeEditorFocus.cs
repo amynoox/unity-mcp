@@ -76,9 +76,7 @@ namespace KitWright.Editor.Tools.Helpers
                 if (!SendBool(objc_getClass("NSThread"), sel_registerName("isMainThread")))
                 { reason = "AppKit focus requires the Editor main thread."; return false; }
                 var app = SendPointer(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
-                var main = SendPointer(app, sel_registerName("mainWindow"));
-                if (main == IntPtr.Zero) main = SendPointer(app, sel_registerName("keyWindow"));
-                if (main == IntPtr.Zero) { reason = "This Editor has no native main/key window."; return false; }
+                if (app == IntPtr.Zero) { reason = "This Editor has no native application."; return false; }
                 // Restore only our hidden Editor. Use AppKit's normal self-activation,
                 // never an arbitrary process or an ignored/forced activation option.
                 if (SendBool(app, sel_registerName("isHidden")))
@@ -88,9 +86,15 @@ namespace KitWright.Editor.Tools.Helpers
                     SendVoid(app, activate); // macOS 14+ cooperative activation.
                 else
                     SendVoidBool(app, sel_registerName("activateIgnoringOtherApps:"), false);
+                // A hidden app may have neither window until AppKit processes the
+                // unhide request. Do not refuse before unhide, or require a synchronous
+                // restoration: later observations still have to verify a key window.
+                var main = SendPointer(app, sel_registerName("mainWindow"));
+                if (main == IntPtr.Zero) main = SendPointer(app, sel_registerName("keyWindow"));
                 // Making a window key does not itself establish application activation.
                 // The workflow must still verify both facts on later Editor updates.
-                SendVoidArgument(main, sel_registerName("makeKeyAndOrderFront:"), IntPtr.Zero);
+                if (main != IntPtr.Zero)
+                    SendVoidArgument(main, sel_registerName("makeKeyAndOrderFront:"), IntPtr.Zero);
                 return true; // Request issued, not a claim that focus was granted.
 #else
                 reason = "Only Windows and macOS interactive Editors are supported.";
