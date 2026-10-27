@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- This fork no longer checks upstream releases or installs packages from the MCP window. Updates are selected through reviewed project package files; stale upstream offers are ignored. Installation guides, package metadata and generated skill source links now identify `amynoox/unity-mcp`.
 - Project and third-party custom tools returning .NET `Task` or `Task<T>` receive a 30-minute per-call budget by default, so slow Editor game/session loading is not cut off by the ordinary 170/180/300-second server and transport fallbacks. Existing explicit tool budgets take precedence, synchronous and built-in defaults are unchanged, and the broker's existing 32-minute hold remains unchanged. `LongRunningToolAttribute` is public for custom per-method overrides. A timeout still requires state reconciliation before retrying a mutation.
 
 ### Added

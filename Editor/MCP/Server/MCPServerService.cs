@@ -236,7 +236,7 @@ namespace KitWright.Editor.MCP.Server
                     }
                     else
                     {
-                        PluginDebugLogger.Log($"[KitWright] MCP Server started on http://127.0.0.1:{Port}/ If this tool saves you time, please consider giving it a Star on GitHub: https://github.com/kitwright/unity-mcp");
+                        PluginDebugLogger.Log($"[KitWright] MCP Server started on http://127.0.0.1:{Port}/ If this tool saves you time, please consider giving it a Star on GitHub: https://github.com/amynoox/unity-mcp");
                     }
                     PowerThrottling.OptOut();
                     MCPInstanceRegistry.Publish(Port, ApplicationPaths.ProjectRoot, projectName, projectIdentity);

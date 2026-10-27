@@ -9,6 +9,45 @@ namespace KitWright.Editor.Tests
     public sealed class UpdateCheckerVersionTests
     {
         [Test]
+        public void WindowAndBackgroundEntryPoints_KeepProjectManagedUpdatesInactive()
+        {
+            var version = UpdateChecker.CurrentState.CurrentVersion;
+            UpdateChecker.MaybeCheckForUpdatesInBackground();
+            UpdateChecker.UpdateToLatestFromWindow();
+            UpdateChecker.MaybeCheckForUpdatesInBackground();
+
+            var state = UpdateChecker.CurrentState;
+            Assert.AreEqual(version, state.CurrentVersion);
+            Assert.IsFalse(state.HasUpdateAvailable);
+            Assert.IsFalse(state.IsChecking);
+            Assert.IsFalse(state.IsUpdating);
+            Assert.IsFalse(state.UpdateStarted);
+            Assert.AreEqual(string.Empty, state.LatestVersion);
+            Assert.AreEqual(string.Empty, state.LatestReleaseUrl);
+            Assert.AreEqual(0f, state.Progress);
+            Assert.AreEqual(UpdateChecker.UpdatePolicyMessage, state.StatusMessage);
+        }
+
+        [Test]
+        public void ExistingWindowBindings_CanRefreshWithoutStartingAnUpdate()
+        {
+            var notifications = 0;
+            Action refresh = () => notifications++;
+            UpdateChecker.StateChanged += refresh;
+            try
+            {
+                UpdateChecker.MaybeCheckForUpdatesInBackground();
+                UpdateChecker.UpdateToLatestFromWindow();
+                Assert.AreEqual(2, notifications);
+                Assert.IsFalse(UpdateChecker.CurrentState.HasUpdateAvailable);
+            }
+            finally
+            {
+                UpdateChecker.StateChanged -= refresh;
+            }
+        }
+
+        [Test]
         public void ParseComparableVersion_ReadsTagsWithAndWithoutTheVPrefix()
         {
             Assert.AreEqual(new Version(1, 2, 3), UpdateChecker.ParseComparableVersion("1.2.3"));

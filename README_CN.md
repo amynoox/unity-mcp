@@ -56,51 +56,23 @@ KitWright MCP for Unity 是一个采用 MIT 协议的 Unity 编辑器 MCP 服务
 在 Unity 中，打开 **Window → Package Manager → + → Add package from git URL**：
 
 ```
-https://github.com/kitwright/unity-mcp.git#upm
+https://github.com/amynoox/unity-mcp.git#main
 ```
 
 > 💡 在 clone 或安装之前，如果你愿意顺手点一个 ⭐，会非常感谢。
 
-### 可选方案：通过 OpenUPM 安装
+### 更新此 fork
 
-如果你希望 Unity Package Manager 显示 registry 提供的完整“版本历史记录”并能选择历史版本，可以改用 OpenUPM 安装。
+本仓库维护的是 `amynoox/unity-mcp` fork。请使用上面的 Git URL；
+上游 OpenUPM 和 Asset Store 发行包不包含此 fork 的修改。
 
-使用 OpenUPM CLI：
-
-```bash
-openupm add com.kitwright.unity.mcp
-```
-
-或者手动在 `Packages/manifest.json` 中添加 scoped registry：
-
-```json
-{
-  "scopedRegistries": [
-    {
-      "name": "OpenUPM",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "com.kitwright"
-      ]
-    }
-  ],
-  "dependencies": {
-    "com.kitwright.unity.mcp": "1.0.1"
-  }
-}
-```
-
-如果之前是用 Git URL 安装的，先移除 Git dependency，再从 OpenUPM 安装。Git 来源的包在 Unity 中只会显示当前解析到的 Git 版本，不会显示 registry 提供的完整 Version History。
-
-### 可选方案：从 Unity Asset Store 安装
-
-导入 Asset Store 包时会弹出 **This Unity Package has Package Manager dependencies** 对话框，请选择 **Install/Upgrade**。本包需要 `com.unity.nuget.newtonsoft-json`，跳过该提示会导致项目缺少该依赖，KitWright 的所有脚本都无法编译。
-
-如果已经点了 Skip，插件会在下一次域重载时询问是否自动安装该依赖；你也可以自己从 **Window → Package Manager → + → Add package by name** 添加：
-
-```
-com.unity.nuget.newtonsoft-json
-```
+内置 release 检查和安装功能已禁用。更新通过项目中经过审核并纳入版本控制的
+package 文件进行。The Ranchers QA 的两个 package URL 使用
+`https://github.com/amynoox/unity-mcp.git#main`，但 game master 提交的
+`Packages/packages-lock.json` 中的具体 hash 才决定批准的版本。
+新 MCP 提交必须先通过独立的游戏维护 Draft PR 和人工合并，再在拥有控制权的空闲
+检查点同步。每台机器确认实际加载版本，并在整个测试及所有协助机器上保持同一
+game/package 快照。不得独立刷新 main 或修改 package cache。
 
 ### 2. 启动 MCP Server
 
@@ -265,7 +237,7 @@ url = "http://127.0.0.1:8765/"
 - `execute_code` safety checks 和更严格的文件系统 guard 现在可在 **Settings** 页签设置默认值，默认开启；它会阻止明显破坏性片段、宽泛的 `System.IO` 写入、原始文件流、绝对路径、用户/系统目录路径和 `../` 穿越路径。它拦截的是失误，不是恶意：`safety_checks` 本身就是一个工具参数，任何能调用 `execute_code` 的客户端都可以传 `safety_checks=false`，同时跳过源码黑名单和编译后程序集 guard。它既不是沙箱，也不是安全边界 — 详见 [SECURITY.md](./SECURITY.md)。
 - 插件 debug 日志默认关闭，也可在 **Settings** 页签中开启；Warning 和 Error 始终会输出到 Unity Console。
 - 所有已暴露的 MCP 工具都会直接执行，不再提供额外的 approval 开关。
-- 窗口会在后台检查新版本，有更新时在标题栏显示 **Update** 按钮：Git 安装会直接重新拉取，`.unitypackage` 导入会自动下载并导入最新版。
+- 本 fork 不在 MCP 窗口检查上游 release 或安装更新；版本由经过审核的项目 package 文件决定。
 
 ## 能力概览
 
@@ -284,7 +256,7 @@ url = "http://127.0.0.1:8765/"
 - **`execute_code` 的 `IKitWrightCommand` 模板** — 新模板自动 Undo（`ctx.RegisterObjectCreation` / `ctx.RegisterObjectModification` / `ctx.DestroyObject`）、结构化日志（`ctx.Log/LogWarning/LogError`），并把改动列表回传给 agent
 - **Resources 与 Prompts** — 暴露实时项目上下文、场景/选择/错误资源、资源模板，以及常见 Unity 工作流的可复用 MCP Prompt
 - **输入模拟 + 截图验证** — 在 Play Mode 中模拟键盘/鼠标，再用 Game View / Scene View 截图验证结果
-- **内置更新** — MCP Window 会提示新版本，并根据安装方式自动重新拉取 Git 包或导入最新 `unitypackage`
+- **项目管理更新** — 使用项目记录并批准的 fork 版本；测试期间保持该版本
 - **Integrations 页签** — 自动检测 Hot Reload、Memory Profiler、Addressables、Input System、Timeline、URP 和 Test Framework，并显示各自解锁了哪些工具
 - **一键客户端配置** — 直接在 Unity 窗口里为 19 个目标写入 MCP 配置：Claude Code、Cursor、VS Code（含 Insiders）、Codex、Windsurf、Cline、Kiro、Trae、Rider（含 Junie）、Kimi Code、Qwen Code、Antigravity、Kilo Code、OpenCode、GitHub Copilot CLI、CodeBuddy CLI、Roo Code
 - **工具暴露控制** — 编辑 `core` 和 `full` 各自暴露的具体工具
