@@ -459,6 +459,27 @@ Public static methods on the class are discovered automatically, converted to sn
 
 Project-declared tools are exposed under **every** profile, including the default `core`, since writing one is already an explicit opt-in — a custom tool would otherwise be invisible to the profile most clients connect with. They still appear in the **Tool Exposure** tab, so a profile configured there can turn them off like any built-in tool.
 
+### Asynchronous custom tools and loading budgets
+
+Return `System.Threading.Tasks.Task` or `Task<T>` from asynchronous custom tools.
+The dispatcher awaits that task before returning its final value. UniTask operations
+may still be awaited inside the method, or converted once with `AsTask()` at the
+MCP boundary; returning a UniTask directly does not make the dispatcher await it.
+
+Project and third-party tools returning `Task`/`Task<T>` receive a **30-minute
+(1800-second)** call budget by default, including slow Unity Editor game/session
+loading. Ordinary synchronous tools and built-in tools retain their existing
+budgets. `[LongRunningTool(seconds)]` is public and can set an explicit per-method
+budget; the usual server/transport fallback still applies when it is larger.
+The existing broker holds requests for 32 minutes, so keep tool budgets at or below
+30 minutes and call separate long loading steps individually.
+
+This is a waiting budget, not an artificial delay or a guarantee that the game is
+ready. A tool must await its actual completion condition before returning success.
+The external MCP client must also permit the longer call. A disconnected client or
+timeout does not cancel an already-started game operation: inspect its current
+state before retrying a save creation, session start, teleport or other mutation.
+
 ## Architecture
 
 ```
@@ -492,3 +513,4 @@ Found a vulnerability? Report it privately — see the [Security Policy](SECURIT
 [MIT](LICENSE) — Free to use, modify, distribute, and integrate into commercial or open-source projects.
 
 The KitWright name and logo are trademarks of the KitWright project and are **not** covered by the MIT license. You may not use the name or logo to brand derivative works or imply endorsement without prior written permission. All rights to the brand assets (files under `Editor/Icons/`) are reserved.
+

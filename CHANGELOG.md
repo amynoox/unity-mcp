@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Project and third-party custom tools returning .NET `Task` or `Task<T>` receive a 30-minute per-call budget by default, so slow Editor game/session loading is not cut off by the ordinary 170/180/300-second server and transport fallbacks. Existing explicit tool budgets take precedence, synchronous and built-in defaults are unchanged, and the broker's existing 32-minute hold remains unchanged. `LongRunningToolAttribute` is public for custom per-method overrides. A timeout still requires state reconciliation before retrying a mutation.
+
 ### Added
 - `focus_unity_editor` and `focus_game_view`: current-Editor-only native Windows/macOS activation and Game View keyboard focus, with post-request verification on two later Editor updates. Both are available in minimal/core profiles. They report OS refusal, busy/modal/headless state, ambiguous or missing Game Views, and timeouts without claiming input readiness. `get_editor_state` now includes native focus observations. No shell, injected input, permission change, session unlock, or arbitrary process target is used.
 
@@ -665,3 +668,4 @@ First Unity Asset Store release.
 - One-click MCP config generation for Claude Code, Cursor, VS Code, Trae, Kiro, and Codex
 - Domain reload survival across Unity recompilations
 - UPM package distribution via Git URL
+

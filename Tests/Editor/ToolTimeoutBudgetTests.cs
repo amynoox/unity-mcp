@@ -1,6 +1,7 @@
 // Copyright (C) KitWright. Licensed under MIT.
 
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using KitWright.Editor.MCP.Server;
 using KitWright.Editor.Tools;
 using NUnit.Framework;
@@ -9,6 +10,39 @@ namespace KitWright.Editor.Tests
 {
     public sealed class ToolTimeoutBudgetTests
     {
+        [Test]
+        public void LongRunningTool_IsPublicForProjectAssemblies()
+        {
+            Assert.IsTrue(typeof(LongRunningToolAttribute).IsPublic);
+        }
+
+        [Test]
+        public void ProjectAsyncTools_GetThirtyMinutesAcrossServerAndTransports()
+        {
+            ToolRegistry.ScanAssemblies(new[] { typeof(ToolRegistry).Assembly, typeof(ProjectTimeoutFixtures).Assembly });
+            try
+            {
+                foreach (var name in new[] { "project_async_budget_probe", "project_async_void_budget_probe" })
+                {
+                    foreach (var fallback in new[] { 170, 180, 300 })
+                        Assert.AreEqual(1800, ToolRegistry.TimeoutSecondsForRequest(
+                            "tools/call", new Dictionary<string, object> { { "name", name } }, fallback));
+                }
+                Assert.AreEqual(900, ToolRegistry.TimeoutSecondsForRequest("tools/call",
+                    new Dictionary<string, object> { { "name", "project_explicit_budget_probe" } }));
+                Assert.AreEqual(180, ToolRegistry.TimeoutSecondsForRequest("tools/call",
+                    new Dictionary<string, object> { { "name", "project_sync_budget_probe" } }));
+                Assert.AreEqual(180, ToolRegistry.TimeoutSecondsForRequest("tools/list",
+                    new Dictionary<string, object> { { "name", "project_async_budget_probe" } }));
+                Assert.AreEqual(1800, ToolRegistry.BatchBudgetSeconds(
+                    new[] { "project_async_budget_probe" }, 170));
+            }
+            finally
+            {
+                ToolRegistry.ScanAssemblies();
+            }
+        }
+
         // The advertised numbers only mean something if the per-call ceiling can honour them:
         // CompilationFunctions.cs:32 caps timeout_seconds at 120, and the call has to come back
         // before HttpMCPTransport.cs gives up at 180s.
@@ -51,4 +85,22 @@ namespace KitWright.Editor.Tests
             }
         }
     }
+
+    [ToolProvider("Timeout test fixtures")]
+    internal static class ProjectTimeoutFixtures
+    {
+        [System.ComponentModel.Description("Test fixture: project async result.")]
+        public static Task<bool> ProjectAsyncBudgetProbe() => Task.FromResult(true);
+
+        [System.ComponentModel.Description("Test fixture: project async completion.")]
+        public static Task ProjectAsyncVoidBudgetProbe() => Task.CompletedTask;
+
+        [System.ComponentModel.Description("Test fixture: explicit custom timeout.")]
+        [LongRunningTool(900)]
+        public static Task<bool> ProjectExplicitBudgetProbe() => Task.FromResult(true);
+
+        [System.ComponentModel.Description("Test fixture: ordinary synchronous result.")]
+        public static bool ProjectSyncBudgetProbe() => true;
+    }
 }
+

@@ -56,11 +56,12 @@ namespace KitWright.Editor.Tools
     [AttributeUsage(AttributeTargets.Method)]
     internal sealed class OffEditorThreadAttribute : Attribute { }
 
-    /// A tool that legitimately blocks the editor for minutes (a player build, a NavMesh bake).
-    /// The transports widen their per-request timeout to this budget instead of answering
-    /// "Request timeout" while the work is still running and the main thread is pinned.
+    /// A tool that legitimately takes minutes, either blocking or asynchronously awaiting work.
+    /// Public so project and third-party editor tools can choose an explicit per-call budget.
+    /// The server and transports widen their timeout to this budget; this does not cancel the
+    /// underlying operation or override a shorter timeout imposed by an external MCP client.
     [AttributeUsage(AttributeTargets.Method)]
-    internal sealed class LongRunningToolAttribute : Attribute
+    public sealed class LongRunningToolAttribute : Attribute
     {
         public int Seconds { get; }
 
@@ -70,3 +71,4 @@ namespace KitWright.Editor.Tools
         }
     }
 }
+
