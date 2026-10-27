@@ -1,6 +1,7 @@
 // Copyright (C) KitWright. Licensed under MIT.
 
 using System;
+using KitWright.Editor.Services;
 
 namespace KitWright.Editor.MCP.Server
 {
