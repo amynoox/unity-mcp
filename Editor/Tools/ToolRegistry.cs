@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using KitWright.Editor.Api.Models;
 using KitWright.Editor.Settings;
 using Newtonsoft.Json;
@@ -190,6 +191,10 @@ namespace KitWright.Editor.Tools
         /// <summary>Default per-request budget, matching the plain HTTP transport's historical cap.</summary>
         public const int DefaultToolTimeoutSeconds = 180;
 
+        // Project tools can await slow Editor game/session loading. Keep their 30-minute budget
+        // below the existing broker's 32-minute hold deadline, without widening ordinary tools.
+        internal const int DefaultCustomAsyncToolTimeoutSeconds = 1800;
+
         /// <summary>
         /// Seconds a transport should wait for a JSON-RPC request before calling it a timeout:
         /// tools/call gets its tool's budget, everything else the fallback. A build or a bake keeps
@@ -229,10 +234,20 @@ namespace KitWright.Editor.Tools
 
         private const int MaxBatchBudgetSeconds = 1800;
 
-        private static int LongRunningSeconds(string toolName) =>
-            string.IsNullOrEmpty(toolName)
-                ? 0
-                : GetMethod(toolName)?.GetCustomAttribute<LongRunningToolAttribute>()?.Seconds ?? 0;
+        private static int LongRunningSeconds(string toolName)
+        {
+            var method = string.IsNullOrEmpty(toolName) ? null : GetMethod(toolName);
+            if (method == null)
+                return 0;
+
+            var declaredBudget = method.GetCustomAttribute<LongRunningToolAttribute>();
+            if (declaredBudget != null)
+                return declaredBudget.Seconds;
+
+            return IsCustomTool(toolName) && typeof(Task).IsAssignableFrom(method.ReturnType)
+                ? DefaultCustomAsyncToolTimeoutSeconds
+                : 0;
+        }
 
         // The commands argument is a JSON array in a string; a client that sends the array itself
         // arrives here as the parsed list.
@@ -353,3 +368,4 @@ namespace KitWright.Editor.Tools
 
     }
 }
+
