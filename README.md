@@ -21,6 +21,8 @@
 
 ---
 
+This is the maintained `amynoox/unity-mcp` fork of KitWright MCP for Unity, under the original MIT license. Install and update this fork through reviewed project package files as described below.
+
 KitWright MCP for Unity is an MIT-licensed Unity Editor MCP server that lets AI assistants like Claude Code, Cursor, LM Studio, Windsurf, Codex, and VS Code Copilot operate directly inside your running Unity project.
 
 Describe your game in one sentence — your AI assistant builds it in Unity through KitWright MCP for Unity's 274 built-in tools for scene creation, script generation, runtime validation, input simulation, performance analysis, and editor automation.
@@ -74,51 +76,25 @@ If you just want to get connected fast, do these three things:
 In Unity, go to **Window → Package Manager → + → Add package from git URL**:
 
 ```
-https://github.com/kitwright/unity-mcp.git#upm
+https://github.com/amynoox/unity-mcp.git#main
 ```
 
 > 💡 Before you clone or install, a quick ⭐ on GitHub would be greatly appreciated.
 
-### Optional: Install via OpenUPM
+### Updating this fork
 
-If you want Unity Package Manager to show registry-backed package version history and allow version selection, install from OpenUPM instead of Git.
+This repository is the maintained fork at `amynoox/unity-mcp`. Install it from
+the Git URL above; the upstream OpenUPM and Asset Store distributions do not
+contain this fork's changes.
 
-Using the OpenUPM CLI:
-
-```bash
-openupm add com.kitwright.unity.mcp
-```
-
-Or add the scoped registry manually in `Packages/manifest.json`:
-
-```json
-{
-  "scopedRegistries": [
-    {
-      "name": "OpenUPM",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "com.kitwright"
-      ]
-    }
-  ],
-  "dependencies": {
-    "com.kitwright.unity.mcp": "1.0.1"
-  }
-}
-```
-
-If you installed from a Git URL before, remove the Git dependency first, then install from OpenUPM. Git-installed packages only show the resolved Git version in Unity and do not get the registry-backed Version History list.
-
-### Optional: Install from the Unity Asset Store
-
-Importing the Asset Store package shows a **This Unity Package has Package Manager dependencies** dialog. Choose **Install/Upgrade** — the package needs `com.unity.nuget.newtonsoft-json`, and skipping the prompt leaves the project without it, which stops every KitWright script from compiling.
-
-If you already chose Skip, the package offers to install the dependency for you on the next domain reload; you can also add it yourself from **Window → Package Manager → + → Add package by name**:
-
-```
-com.unity.nuget.newtonsoft-json
-```
+The built-in release checker and installer are disabled. Update through reviewed,
+versioned project package files. For The Ranchers QA, both package URL fields use
+`https://github.com/amynoox/unity-mcp.git#main`, while the concrete hash in
+`Packages/packages-lock.json` committed in game master selects the approved revision.
+A new MCP commit requires a dedicated game maintenance Draft PR and human merge
+before workers adopt it at an owned idle checkpoint. Workers verify the package
+actually loaded and keep the same game/package snapshot throughout the test and
+on every helper. They never independently refresh main or edit package caches.
 
 ### 2. Start the MCP Server
 
@@ -281,7 +257,7 @@ Open your AI client and try: *"Create a 3D platformer level with 5 floating plat
 - `execute_code` safety checks and the stricter filesystem guard are enabled by default from the **Settings** tab. The guard blocks obvious destructive snippets, broad `System.IO` writes, raw file streams, and absolute/user/system/traversal paths. It catches accidents, not intent: `safety_checks` is a tool argument, so any client that can call `execute_code` can pass `safety_checks=false` and skip both the source blocklist and the compiled-assembly guard. It is neither a sandbox nor a security boundary — see [SECURITY.md](./SECURITY.md).
 - Plugin debug logging is off by default and can also be enabled from the **Settings** tab. Warnings and errors are always written to the Unity Console.
 - All exposed MCP tools run directly. There is no extra approval toggle.
-- The window checks for updates in the background and shows an **Update** button in its header when a newer release exists — it can refresh Git installs in place or download and import the latest `unitypackage` automatically.
+- Package updates use reviewed project package files; this fork does not check upstream releases or install updates from the MCP window.
 
 ## Why This Project
 
@@ -300,7 +276,7 @@ Open your AI client and try: *"Create a 3D platformer level with 5 floating plat
 - **`IKitWrightCommand` for `execute_code`** — New snippet template with auto-Undo (`ctx.RegisterObjectCreation` / `ctx.RegisterObjectModification` / `ctx.DestroyObject`), structured logs (`ctx.Log/LogWarning/LogError`), and a tracked changelog returned to the agent
 - **Resources & Prompts** — Live project context, scene/selection/error resources, resource templates, and reusable workflow prompts
 - **Input Simulation + Screenshots** — Drive play mode with keyboard/mouse simulation and verify results with game/scene captures
-- **Built-in Updating** — The MCP Window surfaces new releases and either re-pulls the Git package or auto-imports the latest `unitypackage`
+- **Project-managed Updates** — The consuming project selects and records the approved fork revision; active tests retain it
 - **Integrations Tab** — Detects Hot Reload, Memory Profiler, Addressables, Input System, Timeline, URP, and Test Framework, and shows which tools each one unlocks
 - **One-Click Client Configuration** — Write MCP config entries for 19 targets directly from the Unity window: Claude Code, Cursor, VS Code (+ Insiders), Codex, Windsurf, Cline, Kiro, Trae, Rider (+ Junie), Kimi Code, Qwen Code, Antigravity, Kilo Code, OpenCode, GitHub Copilot CLI, CodeBuddy CLI, and Roo Code
 - **Tool Exposure Control** — Edit the exact tools exposed by `core` and `full`

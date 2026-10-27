@@ -973,7 +973,7 @@ version: {skill.Version}
 - Skill id: `{skill.Id}`
 - Skill version: `{skill.Version}`
 - Built-in: `{skill.IsBuiltIn}`
-- Source: `https://github.com/kitwright/unity-mcp`
+- Source: `https://github.com/amynoox/unity-mcp`
 ";
         }
 
@@ -1018,7 +1018,7 @@ platform: {platform.ToString().ToLowerInvariant()}
 
 - Original skill id: `{skill.Id}`
 - Skill version: `{skill.Version}`
-- Source repository: `https://github.com/kitwright/unity-mcp`
+- Source repository: `https://github.com/amynoox/unity-mcp`
 ";
         }
 
@@ -1295,7 +1295,7 @@ $@"
 
 - Original skill id: `{skill.Id}`
 - Skill version: `{skill.Version}`
-- Source repository: `https://github.com/kitwright/unity-mcp`
+- Source repository: `https://github.com/amynoox/unity-mcp`
 ";
 
             return header + body + footer;
