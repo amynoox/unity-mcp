@@ -1,10 +1,21 @@
 # Release Checklist
 
-Use this checklist before publishing a new open-source release of KitWright MCP for Unity.
+Use this checklist before publishing a release of the `amynoox/unity-mcp` fork.
 
-The local helper `scripts~/release.sh <version>` automates the high-risk mechanical steps:
-version bumping, Unity EditMode tests, `.unitypackage` export, pathname validation, SHA/manifest generation,
-wrapper packing, and opt-in publishing flags for GitHub, NuGet, and the MCP Registry.
+The local helper `scripts~/release.sh <version>` prepares Unity artifacts, validates
+their paths and generates hashes/notes. Supply an explicitly authorized idle test
+project through `UNITY_PROJECT_ROOT`; the helper does not select a game checkout.
+Preparation and publication are separate. Version changes must go through a Draft
+PR and human merge first. `--publish-github` accepts only clean tracked files at
+the exact remote main commit with that version and creates a Draft GitHub Release.
+It never force-pushes a branch or overwrites an existing tag/release.
+
+The fork is consumed through Git. NuGet, OpenUPM and the old wrapper-registry
+options are refused before any mutation. The inherited MCP Registry workflow is
+retired: it described an upstream wrapper that this fork does not distribute.
+A Registry listing requires its own reviewed distribution and metadata before
+being added here. Tags trigger no Registry publication. A hosted run still needs
+the explicit human authorization below; do not invoke one for QA package adoption.
 
 ## 1. Repository Hygiene
 
@@ -105,8 +116,8 @@ the hosted skip-reporting checks still apply.
 ## 6. Publish
 
 - [ ] Commit the release changes with a clear release-oriented message
-- [ ] Create and push the release tag
-- [ ] Create the GitHub Release notes
+- [ ] Create the Draft GitHub Release from the reviewed main commit
+- [ ] Have the human validate and publish that release/tag; preserve existing tags/releases
 - [ ] Verify the public repository renders the README and package documentation correctly
 
 ## 7. Post-Release

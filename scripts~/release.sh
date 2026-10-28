@@ -1,55 +1,42 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REPO="kitwright/unity-mcp"
-UPM_BRANCH="upm"
+REPO="amynoox/unity-mcp"
+RELEASE_COMMIT=""
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_ROOT="${UNITY_PROJECT_ROOT:-$(cd "$ROOT/../.." && pwd)}"
-ARTIFACT_ROOT="${RELEASE_ARTIFACT_DIR:-$PROJECT_ROOT/release-artifacts}"
-WRAPPER_ROOT="${MCP_WRAPPER_ROOT:-}"
+PROJECT_ROOT="${UNITY_PROJECT_ROOT:-}"
+ARTIFACT_ROOT="${RELEASE_ARTIFACT_DIR:-$ROOT/../release-artifacts}"
 VALIDATION_TMP=""
-
-if [[ -z "$WRAPPER_ROOT" && -d "$PROJECT_ROOT/mcp-release/funseaai-unity-mcp" ]]; then
-  WRAPPER_ROOT="$PROJECT_ROOT/mcp-release/funseaai-unity-mcp"
-fi
 
 usage() {
   cat <<'EOF'
 Usage: scripts~/release.sh <version> [options]
 
-Local release helper for KitWright Unity MCP.
+Local artifact helper for the amynoox/unity-mcp fork.
 
 Default behavior:
-  - bump package.json and local wrapper versions when the wrapper workspace exists
-  - run Unity EditMode tests
-  - export Assets/unity-mcp as a filtered unitypackage without local-only files or tests
-  - validate all unitypackage pathnames stay under Assets/unity-mcp
-  - generate release notes, SHA256SUMS, and a release manifest
-  - dotnet pack the stdio wrapper when the wrapper workspace exists
-  - archive local artifacts under release-artifacts/<version>
+  - prepare versioned Unity package artifacts in an explicitly selected test project
+  - run local Unity EditMode tests and validate the exported package
+  - generate release notes, SHA256SUMS and a release manifest
 
 Publishing is opt-in:
-  --publish-github     Build the "$UPM_BRANCH" branch (this release with Tests/ stripped),
-                       tag v<version> there — not on main — and create or update the
-                       GitHub Release asset. The Git URL install and OpenUPM both resolve
-                       to that tag, so this is also what keeps Tests/ out of either.
-  --publish-nuget      Push the wrapper nupkg to NuGet; requires NUGET_API_KEY
-  --publish-registry   Publish server.json with mcp-publisher after NuGet indexing
-  --verify-openupm     Wait for OpenUPM to index the Unity package version
+  --publish-github     Create a Draft GitHub Release from the exact reviewed main
+                       commit. Requires clean tracked files, matching version,
+                       approved origin and no existing tag/release. No branch rewrite.
+  NuGet, OpenUPM and wrapper-registry publishing are not configured for this fork.
+  Registry publication needs a separately reviewed distribution for this fork.
 
 Options:
   --no-tests           Skip Unity EditMode tests
   --no-export          Skip unitypackage export; validates an existing package if present
-  --no-wrapper         Skip wrapper version bump and dotnet pack
+  --no-wrapper         Compatibility option; this fork does not publish a wrapper
   --dry-run            Print major actions without mutating files or publishing
   -h, --help           Show this help
 
 Environment:
   UNITY_BIN            Full path to the Unity executable. Auto-detected on macOS if omitted.
-  UNITY_PROJECT_ROOT   Unity project root. Defaults to the parent project containing Assets/.
-  MCP_WRAPPER_ROOT     Private stdio wrapper workspace, if available.
-  MCP_PUBLISHER_BIN    mcp-publisher binary for registry publishing.
-  NUGET_API_KEY        NuGet API key for --publish-nuget.
+  UNITY_PROJECT_ROOT   Explicit existing, owned idle test project for tests/export.
+  RELEASE_ARTIFACT_DIR  Output directory; defaults beside the source checkout.
 EOF
 }
 
@@ -73,22 +60,17 @@ shift || true
 
 RUN_TESTS=1
 EXPORT_PACKAGE=1
-USE_WRAPPER=1
 PUBLISH_GITHUB=0
-PUBLISH_NUGET=0
-PUBLISH_REGISTRY=0
-VERIFY_OPENUPM=0
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-tests) RUN_TESTS=0 ;;
     --no-export) EXPORT_PACKAGE=0 ;;
-    --no-wrapper) USE_WRAPPER=0 ;;
+    --no-wrapper) : ;;
     --publish-github) PUBLISH_GITHUB=1 ;;
-    --publish-nuget) PUBLISH_NUGET=1 ;;
-    --publish-registry) PUBLISH_REGISTRY=1 ;;
-    --verify-openupm) VERIFY_OPENUPM=1 ;;
+    --publish-nuget|--publish-registry|--verify-openupm)
+      fail "$1 is not configured for this fork; no source, artifact or publication was changed" ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) fail "unknown option: $1" ;;
@@ -193,38 +175,7 @@ if (updated === text && !text.includes(`"version": "${version}"`)) {
 fs.writeFileSync(path, updated);
 NODE
 
-  info "Updating OpenUPM documentation snippets"
-  run node - "$ROOT/README.md" "$ROOT/README_CN.md" "$VERSION" <<'NODE'
-const fs = require("fs");
-const files = process.argv.slice(2, -1);
-const version = process.argv[process.argv.length - 1];
-for (const file of files) {
-  if (!fs.existsSync(file)) continue;
-  const text = fs.readFileSync(file, "utf8");
-  const updated = text.replace(
-    /("com\.kitwright\.unity\.mcp"\s*:\s*")[^"]+(")/g,
-    `$1${version}$2`
-  );
-  fs.writeFileSync(file, updated);
-}
-NODE
 
-  if [[ "$USE_WRAPPER" == 1 && -n "$WRAPPER_ROOT" && -d "$WRAPPER_ROOT" ]]; then
-    info "Bumping wrapper version in $WRAPPER_ROOT"
-    run perl -0pi -e "s#<Version>[^<]+</Version>#<Version>$VERSION</Version>#" "$WRAPPER_ROOT/FunseaAI.Unity.Mcp.csproj"
-    run perl -0pi -e "s#kitwright-unity-mcp [0-9]+\\.[0-9]+\\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?#kitwright-unity-mcp $VERSION#g" "$WRAPPER_ROOT/Program.cs"
-    run node - "$WRAPPER_ROOT/server.json" "$VERSION" <<'NODE'
-const fs = require("fs");
-const path = process.argv[2];
-const version = process.argv[3];
-const json = JSON.parse(fs.readFileSync(path, "utf8"));
-json.version = version;
-for (const pkg of json.packages || []) pkg.version = version;
-fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
-NODE
-  elif [[ "$USE_WRAPPER" == 1 ]]; then
-    info "Wrapper workspace not found; skipping wrapper bump and pack"
-  fi
 }
 
 run_git_checks() {
@@ -277,8 +228,10 @@ run_unity_tests() {
 }
 
 cleanup_exporter() {
-  if [[ -n "${EXPORTER_FILE:-}" ]]; then
+  [[ "$DRY_RUN" == 0 ]] || return 0
+  if [[ "${CREATED_EXPORTER_FILE:-0}" == 1 ]]; then
     rm -f "$EXPORTER_FILE" "$EXPORTER_FILE.meta"
+    CREATED_EXPORTER_FILE=0
   fi
   if [[ "${CREATED_EDITOR_DIR:-0}" == 1 ]]; then
     rmdir "$PROJECT_ROOT/Assets/Editor" 2>/dev/null || true
@@ -311,6 +264,8 @@ export_unitypackage() {
 
   info "Creating temporary Unity export method"
   if [[ "$DRY_RUN" == 0 ]]; then
+    [[ ! -e "$EXPORTER_FILE" && ! -e "$EXPORTER_FILE.meta" ]] || fail "Existing exporter preserved: $EXPORTER_FILE"
+    CREATED_EXPORTER_FILE=1
     cat > "$EXPORTER_FILE" <<EOF
 using System;
 using System.Collections.Generic;
@@ -463,145 +418,41 @@ generate_notes_and_sums() {
   "gitSha": "$(git -C "$ROOT" rev-parse HEAD)",
   "unityProjectRoot": "$PROJECT_ROOT",
   "unityPackage": "$PACKAGE_OUTPUT",
-  "wrapperRoot": "$WRAPPER_ROOT",
   "generatedAtUtc": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 }
 EOF
 }
 
-pack_wrapper() {
-  [[ "$USE_WRAPPER" == 1 ]] || { info "Skipping wrapper pack"; return; }
-  [[ -n "$WRAPPER_ROOT" && -d "$WRAPPER_ROOT" ]] || { info "Wrapper workspace not found; skipping wrapper pack"; return; }
-  require_command dotnet
-
-  info "Packing wrapper"
-  run rm -rf "$WRAPPER_ROOT/bin" "$WRAPPER_ROOT/obj" "$WRAPPER_ROOT/nupkg"
-  run dotnet pack "$WRAPPER_ROOT/FunseaAI.Unity.Mcp.csproj" -c Release
-
-  local nupkg="$WRAPPER_ROOT/nupkg/kitwright.unity.mcp.$VERSION.nupkg"
-  [[ -f "$nupkg" ]] || fail "expected nupkg not found: $nupkg"
-  run cp "$nupkg" "$OUT_DIR/"
-  run cp "$WRAPPER_ROOT/server.json" "$OUT_DIR/server.json"
-}
-
-# Builds the $UPM_BRANCH branch (this release with Tests/ stripped) and pushes it. Sets
-# UPM_COMMIT to the resulting commit so the caller can tag the release there.
-#
-# OpenUPM's tracking config for this package (data/packages/com.kitwright.unity.mcp.yml in
-# openupm/openupm) has no branch field — it watches tags matching gitTagPrefix "v" wherever
-# they land. So does the Git URL install when someone pins a version (#vX.Y.Z). The only way
-# to keep both of those Tests/-free without touching that external config is to put the
-# "vX.Y.Z" tag itself on this branch instead of on main.
-build_upm_branch() {
+# Refuse before any source/artifact mutation. Publishing never moves a branch,
+# overwrites a tag/release or packages unreviewed working-tree contents.
+check_publication_source() {
+  [[ "$PUBLISH_GITHUB" == 1 && "$DRY_RUN" == 0 ]] || return 0
   require_command git
-  info "Building $UPM_BRANCH branch (Tests/ stripped) for v$VERSION"
-
-  # bump_versions edits package.json/README in place and never commits — capture the
-  # working tree as it stands (tracked changes included) rather than HEAD, or a release
-  # cut before the version-bump commit lands would publish the branch one version stale.
-  local snapshot
-  snapshot="$(git -C "$ROOT" stash create)"
-  [[ -n "$snapshot" ]] || snapshot="$(git -C "$ROOT" rev-parse HEAD)"
-
-  local worktree_dir
-  worktree_dir="$(mktemp -d)"
-  git -C "$ROOT" worktree add --detach "$worktree_dir" "$snapshot" >/dev/null
-
-  (
-    cd "$worktree_dir"
-    git rm -rq Tests
-    git commit -q -m "chore(upm): strip the package-maintainer test suite for v$VERSION"
-  )
-
-  UPM_COMMIT="$(git -C "$worktree_dir" rev-parse HEAD)"
-  git -C "$worktree_dir" branch -f "$UPM_BRANCH" HEAD
-  git -C "$ROOT" push --force origin "refs/heads/$UPM_BRANCH:refs/heads/$UPM_BRANCH"
-  git -C "$ROOT" worktree remove "$worktree_dir" --force
+  require_command gh
+  local origin remote_main version
+  origin="$(git -C "$ROOT" remote get-url origin)"
+  case "$origin" in
+    https://github.com/amynoox/unity-mcp|https://github.com/amynoox/unity-mcp.git|git@github.com:amynoox/unity-mcp.git) ;;
+    *) fail "Publication requires the amynoox/unity-mcp origin" ;;
+  esac
+  [[ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]] || fail "Commit/review source changes before publishing"
+  RELEASE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
+  remote_main="$(git -C "$ROOT" ls-remote --exit-code origin refs/heads/main | cut -f1)"
+  [[ "$RELEASE_COMMIT" == "$remote_main" ]] || fail "Publication requires the exact reviewed remote main commit"
+  version="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version' "$ROOT/package.json")"
+  [[ "$version" == "$VERSION" ]] || fail "Requested version must already be committed and merged into main"
+  [[ -z "$(git -C "$ROOT" ls-remote --tags origin "refs/tags/v$VERSION" "refs/tags/v$VERSION^{}")" ]] || fail "Existing release tag preserved"
+  if gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1; then
+    fail "Existing release preserved; inspect it instead of replaying publication"
+  fi
 }
 
 publish_github() {
   [[ "$PUBLISH_GITHUB" == 1 ]] || return 0
-  require_command gh
-
-  if [[ "$DRY_RUN" == 1 ]]; then
-    printf '+ build %s from the working tree (Tests/ stripped), tag v%s there, publish GitHub Release\n' "$UPM_BRANCH" "$VERSION"
-    return
-  fi
-
-  # The Release asset itself (the unitypackage) already excludes Tests/ via
-  # export_unitypackage's IsAllowedPackagePath — this is only about where the "v$VERSION"
-  # tag points, since that tag is also what OpenUPM and a pinned Git URL install resolve.
-  local existing=0
-  gh release view "v$VERSION" -R "$REPO" >/dev/null 2>&1 && existing=1
-
-  if [[ "$existing" == 0 ]]; then
-    build_upm_branch
-  fi
-
-  info "Publishing GitHub Release v$VERSION"
-  if [[ "$existing" == 1 ]]; then
-    run gh release upload "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" --clobber
-    run gh release edit "v$VERSION" -R "$REPO" --notes-file "$NOTES_FILE"
-  else
-    run gh release create "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" \
-      --title "v$VERSION" --notes-file "$NOTES_FILE" --target "$UPM_COMMIT"
-  fi
-}
-
-publish_nuget() {
-  [[ "$PUBLISH_NUGET" == 1 ]] || return 0
-  require_command dotnet
-  [[ -n "${NUGET_API_KEY:-}" ]] || fail "NUGET_API_KEY is required for --publish-nuget"
-
-  local nupkg="$OUT_DIR/kitwright.unity.mcp.$VERSION.nupkg"
-  [[ -f "$nupkg" ]] || fail "nupkg not found: $nupkg"
-
-  info "Publishing NuGet package"
-  run dotnet nuget push "$nupkg" \
-    -k "$NUGET_API_KEY" \
-    -s https://api.nuget.org/v3/index.json \
-    --skip-duplicate
-}
-
-wait_for_nuget_index() {
-  [[ "$PUBLISH_REGISTRY" == 1 ]] || return 0
-  require_command curl
-
-  info "Waiting for NuGet flat-container index"
-  local url="https://api.nuget.org/v3-flatcontainer/kitwright.unity.mcp/index.json"
-  for _ in {1..30}; do
-    if curl -fsSL "$url" | rg -q "\"$VERSION\""; then
-      return
-    fi
-    sleep 20
-  done
-  fail "NuGet index did not show $VERSION in time"
-}
-
-publish_registry() {
-  [[ "$PUBLISH_REGISTRY" == 1 ]] || return 0
-
-  local publisher="${MCP_PUBLISHER_BIN:-$PROJECT_ROOT/mcp-release/bin/mcp-publisher}"
-  [[ -x "$publisher" ]] || fail "mcp-publisher not found or not executable: $publisher"
-  [[ -f "$OUT_DIR/server.json" ]] || fail "server.json not found: $OUT_DIR/server.json"
-
-  info "Publishing MCP Registry entry"
-  run "$publisher" publish "$OUT_DIR/server.json"
-}
-
-wait_for_openupm_index() {
-  [[ "$VERIFY_OPENUPM" == 1 ]] || return 0
-  require_command npm
-
-  info "Waiting for OpenUPM package index"
-  for _ in {1..30}; do
-    if npm view com.kitwright.unity.mcp --registry https://package.openupm.com versions --json \
-        | rg -q "\"$VERSION\""; then
-      return
-    fi
-    sleep 20
-  done
-  fail "OpenUPM index did not show $VERSION in time"
+  info "Creating a Draft GitHub Release for $REPO"
+  run gh release create "v$VERSION" "$PACKAGE_OUTPUT" -R "$REPO" \
+    --draft --title "v$VERSION" --notes-file "$NOTES_FILE" \
+    --target "${RELEASE_COMMIT:-<reviewed-main-commit>}"
 }
 
 archive_artifacts() {
@@ -613,6 +464,10 @@ main() {
   require_command node
   require_command rg
   require_command shasum
+  check_publication_source
+  if [[ "$DRY_RUN" == 0 && ( "$RUN_TESTS" == 1 || "$EXPORT_PACKAGE" == 1 ) ]]; then
+    [[ -n "$PROJECT_ROOT" && -d "$PROJECT_ROOT/Assets" ]] || fail "Set UNITY_PROJECT_ROOT to the explicitly authorized idle test project"
+  fi
   run mkdir -p "$OUT_DIR"
 
   bump_versions
@@ -620,17 +475,13 @@ main() {
   run_unity_tests
   export_unitypackage
   if [[ "$DRY_RUN" == 1 ]]; then
-    info "Dry run complete; skipped artifact validation, packing, and publishing"
+    publish_github
+    info "Dry run complete; no files, Unity process or publication changed"
     return
   fi
   validate_unitypackage
-  pack_wrapper
   generate_notes_and_sums
   publish_github
-  publish_nuget
-  wait_for_nuget_index
-  publish_registry
-  wait_for_openupm_index
   archive_artifacts
 }
 
