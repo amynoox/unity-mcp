@@ -16,6 +16,9 @@ class ValidationWorkflowPolicyTests(unittest.TestCase):
                 for automatic in ("    push:", "    pull_request:", "    schedule:", "    pull_request_target:"):
                     self.assertNotIn(automatic, triggers)
 
+    def test_upstream_wrapper_publisher_is_retired(self):
+        self.assertFalse((ROOT / ".github/workflows/publish-mcp-registry.yml").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
